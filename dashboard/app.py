@@ -17,6 +17,7 @@ def create_app(store: GrowattStore) -> Flask:
     def stream():
         def generate():
             last_ts = 0
+            yield ": keep-alive\n\n"
             while True:
                 time.sleep(1)
                 r = store.latest_reading()
@@ -24,6 +25,12 @@ def create_app(store: GrowattStore) -> Flask:
                     last_ts = r.ts
                     d = r.to_dict()
                     yield f"event: reading\ndata: {json.dumps(d)}\n\n"
-        return Response(generate(), mimetype='text/event-stream')
+                else:
+                    yield ": keep-alive\n\n"
+        return Response(generate(), mimetype='text/event-stream', headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        })
 
     return app
