@@ -110,6 +110,14 @@ These registers are Read-Only and provide real-time telemetry.
 | 04 (Input) | 3184-85 | Import Today | U32 | kWh | 0.1 | Bought from Grid today |
 | 04 (Input) | 3186-87 | Export Today | U32 | kWh | 0.1 | Sold to Grid today |
 | 04 (Input) | 3188-89 | Load Today | U32 | kWh | 0.1 | House used today |
+| 04 (Input) | 3190-91 | Import Total | U32 | kWh | 0.1 | Lifetime bought from Grid |
+| 04 (Input) | 3192-93 | Export Total | U32 | kWh | 0.1 | Lifetime sold to Grid |
+| 04 (Input) | 3194-95 | Load Total | U32 | kWh | 0.1 | Lifetime house usage |
+
+### Power Quality & Unmapped (3155-3169)
+| 04 (Input) | 3161 | Total Power Factor | U16 | — | 10000 | 10000 = 1.0 PF |
+| 04 (Input) | 3162-64 | Phase L1/L2/L3 PF | U16 | — | 10000 | Power factor per phase |
+
 
 ---
 
