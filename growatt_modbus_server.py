@@ -1,36 +1,32 @@
 import json
 import logging
-from pymodbus.datastore import ModbusSparseDataBlock, ModbusSlaveContext, ModbusServerContext
+from pymodbus.simulator import SimDevice, SimData, DataType
 from pymodbus.server import StartTcpServer
 from growatt.store import GrowattStore
 
 logger = logging.getLogger("growatt_modbus_server")
 
-class GrowattDataBlock(ModbusSparseDataBlock):
-    def __init__(self, store: GrowattStore):
-        # Initialize with dummy values so the server can start
-        super().__init__({3000: 0})
-        self.store = store
-        self._cache = {}
-
-    def getValues(self, address, count=1):
-        raw_bytes = self.store.get_latest_registers()
-        if raw_bytes:
-            try:
-                # Cache is updated atomically from the serialized payload
-                self._cache = json.loads(raw_bytes.decode('utf-8'))
-            except Exception as e:
-                logger.error("Failed to decode raw payload: %s", e)
-
-        # Modbus protocol expects an array of values
-        # If register is not in cache, fallback to 0 (or 0xFFFF, but 0 is safer)
-        return [self._cache.get(str(address + i), 0) for i in range(count)]
-
 def run(store: GrowattStore, port: int = 5020):
-    block = GrowattDataBlock(store)
-    # zero_mode=True maps requested Modbus address exactly to dictionary key
-    slave_context = ModbusSlaveContext(di=None, co=None, hr=None, ir=block, zero_mode=True)
-    server_context = ModbusServerContext(slaves={1: slave_context}, single=False)
+    # Growatt MOD 12KTL3-HU primary registers span from 3000 to ~3200
+    data = SimData(address=3000, count=200, values=[0]*200, datatype=DataType.REGISTERS)
+
+    async def update_registers(func_code, start_address, address, count, registers, values):
+        if values is None:  # This is a read request
+            raw_bytes = store.get_latest_registers()
+            if raw_bytes:
+                try:
+                    cache = json.loads(raw_bytes.decode('utf-8'))
+                    # Inject cached live data natively into the simulator's memory block
+                    for i in range(count):
+                        reg_addr = address + i
+                        offset = reg_addr - start_address
+                        if 0 <= offset < len(registers):
+                            registers[offset] = cache.get(str(reg_addr), 0)
+                except Exception as e:
+                    logger.error("Failed to decode cache: %s", e)
+        return None
+
+    device = SimDevice(id=1, simdata=[data], action=update_registers)
     
     logger.info("Starting Modbus TCP Mimic Server on 0.0.0.0:%d", port)
-    StartTcpServer(context=server_context, address=("0.0.0.0", port))
+    StartTcpServer(context=device, address=("0.0.0.0", port))
