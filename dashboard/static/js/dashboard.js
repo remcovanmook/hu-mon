@@ -150,7 +150,31 @@ function switchTab(id) {
     document.getElementById(`tab-${id}`).hidden = false;
 }
 
+
+const THEME_CYCLE  = ["light", "dark", "auto"];
+const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("hegg-theme", theme);
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = THEME_LABELS[theme] ?? theme;
+}
+
+function cycleTheme() {
+  const current = document.documentElement.dataset.theme || "light";
+  const next    = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
+  applyTheme(next);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+    const toggleBtn = document.getElementById("theme-toggle");
+    if (toggleBtn) {
+        toggleBtn.addEventListener("click", cycleTheme);
+        const savedTheme = document.documentElement.dataset.theme || "light";
+        toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
+    }
+
     document.getElementById("tab-btn-overview").addEventListener("click", () => switchTab("overview"));
     document.getElementById("tab-btn-pv").addEventListener("click", () => switchTab("pv"));
     document.getElementById("tab-btn-grid").addEventListener("click", () => switchTab("grid"));
@@ -190,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const colorMap = {
             'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
-            'Grid': [COLORS.l1, COLORS.l2, COLORS.l3]
+            'L': [COLORS.l1, COLORS.l2, COLORS.l3]
         };
 
         let html = '';
@@ -225,8 +249,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
-    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
-    createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
+    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
+    createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
 
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
