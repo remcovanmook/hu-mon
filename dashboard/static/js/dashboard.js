@@ -244,9 +244,21 @@ document.addEventListener("DOMContentLoaded", () => {
         { label: 'PV3', color: COLORS.pv3 }, { label: 'PV4', color: COLORS.pv4 }
     ]);
     charts.grid = createChart('chart-grid', [
-        { label: 'Net Grid (W)', color: COLORS.net, borderWidth: 2 },
-        { label: 'L1 (W)', color: COLORS.l1 }, { label: 'L2 (W)', color: COLORS.l2 }, { label: 'L3 (W)', color: COLORS.l3 }
+        {label: 'Net Grid', color: COLORS.net},
+        {label: 'L1', color: COLORS.l1},
+        {label: 'L2', color: COLORS.l2},
+        {label: 'L3', color: COLORS.l3}
     ]);
+    
+    // Stack the L1/L2/L3 phases together as filled areas, leave Net Grid as an overlay line
+    charts.grid.options.scales.y.stacked = true;
+    charts.grid.data.datasets[0].stack = 'net';
+    charts.grid.data.datasets[0].borderWidth = 3;
+    
+    for(let i=1; i<=3; i++) {
+        charts.grid.data.datasets[i].stack = 'phases';
+        charts.grid.data.datasets[i].fill = true;
+    }
     charts.battery = createChart('chart-battery', [
         { label: 'Battery (W)', color: COLORS.returned }
     ]);
