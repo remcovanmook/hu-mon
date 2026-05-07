@@ -103,8 +103,8 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('grid-cards-w', 'Power', 'W', 3, 'Grid');
 
     charts.overview = createChart('chart-power', [
-        { label: 'PV (W)', color: COLORS.pv },
-        { label: 'Grid Net (W)', color: COLORS.grid },
+        { label: 'PV (W)', color: COLORS.pv1 },
+        { label: 'Grid Net (W)', color: COLORS.net },
         { label: 'Load (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
         { label: 'L1 (W)', color: COLORS.l1 }, { label: 'L2 (W)', color: COLORS.l2 }, { label: 'L3 (W)', color: COLORS.l3 }
     ]);
     charts.battery = createChart('chart-battery', [
-        { label: 'Battery (W)', color: COLORS.load }
+        { label: 'Battery (W)', color: COLORS.returned }
     ]);
 
     const tickClock = () => {
