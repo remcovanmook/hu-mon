@@ -1,6 +1,80 @@
 
 "use strict";
 
+// --- Added by Chart Refactor ---
+function niceScale(rawMin, rawMax, maxIntervals = 5) {
+  if (!Number.isFinite(rawMin) || !Number.isFinite(rawMax) || rawMin === rawMax) {
+    return { min: Math.floor(rawMin) - 1, max: Math.ceil(rawMax) + 1, step: 1 };
+  }
+  const range = rawMax - rawMin;
+  const roughStep = range / maxIntervals;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const norm = roughStep / magnitude;
+  let step;
+  if (norm <= 1) step = magnitude;
+  else if (norm <= 2) step = 2 * magnitude;
+  else if (norm <= 5) step = 5 * magnitude;
+  else step = 10 * magnitude;
+  return { min: Math.floor(rawMin / step) * step, max: Math.ceil(rawMax / step) * step, step };
+}
+
+function syncChartScales(chartArray, extremesArray, minFloor = -Infinity) {
+  let globalMin = Infinity, globalMax = -Infinity;
+  extremesArray.forEach(e => {
+    if (e.min < globalMin) globalMin = e.min;
+    if (e.max > globalMax) globalMax = e.max;
+  });
+  if (!Number.isFinite(globalMin) || !Number.isFinite(globalMax)) return;
+  const clampedMin = Math.max(minFloor, globalMin);
+  const { min, max, step } = niceScale(clampedMin, globalMax);
+  const niceMin = Math.max(minFloor, min);
+
+  chartArray.forEach(c => {
+    if(!c) return;
+    c.options.scales.y.min = niceMin;
+    c.options.scales.y.max = max;
+    if(!c.options.scales.y.ticks) c.options.scales.y.ticks = {};
+    c.options.scales.y.ticks.stepSize = step;
+  });
+}
+
+function buildStatusAnnotation(tsMs, statusStr) {
+  return {
+    type: "line", scaleID: "x", value: tsMs,
+    borderColor: "rgba(139, 92, 246, 0.5)", borderWidth: 1, borderDash: [4, 4],
+    label: {
+      display: true, content: statusStr, position: "start",
+      backgroundColor: "rgba(139, 92, 246, 0.8)", color: "#fff",
+      font: { size: 9 }, padding: { x: 4, y: 2 }, rotation: -90, yAdjust: 10
+    }
+  };
+}
+
+function updateSparklineAnnotations(chart, min, max, color) {
+  if(!chart) return;
+  const cStr = typeof color === 'string' && color.startsWith('#') ? color + '80' : color;
+  chart.options.plugins.annotation.annotations = Object.assign({}, chart.options.plugins.annotation.annotations, {
+    minLine: {
+      type: 'line', yMin: min, yMax: min, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
+      label: { display: true, content: min.toFixed(1), position: 'end', backgroundColor: 'transparent', color: color, font: {size: 9} }
+    },
+    maxLine: {
+      type: 'line', yMin: max, yMax: max, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
+      label: { display: true, content: max.toFixed(1), position: 'start', backgroundColor: 'transparent', color: color, font: {size: 9} }
+    }
+  });
+}
+
+const extremes = {
+    pv_v: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
+    pv_c: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
+    grid_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
+    grid_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity}))
+};
+let statusAnnotations = {};
+let lastStatus = null;
+
+
 const charts = {};
 const maxPoints = 60;
 const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
@@ -55,6 +129,7 @@ function getBaseOpts() {
         responsive: true, maintainAspectRatio: false, animation: false,
         transitions: { active: { animation: { duration: 0 } } },
         interaction: { mode: "index", intersect: false },
+        plugins: { annotation: { annotations: {} } },
         elements: { point: { radius: 0, hitRadius: 6 }, line: { tension: 0.3, borderWidth: 1.5 } },
         scales: {
             x: { type: "time", time: { tooltipFormat: "HH:mm:ss" }, ticks: { maxTicksLimit: 8 } },
@@ -181,7 +256,9 @@ function createChart(id, series, showLegend = true) {
     const opts = {
         responsive: true, maintainAspectRatio: false, animation: false,
         interaction: { mode: "index", intersect: false },
+        plugins: { annotation: { annotations: {} } },
         plugins: {
+            annotation: { annotations: {} },
             legend: { 
                 display: showLegend, 
                 position: 'bottom',
@@ -201,11 +278,11 @@ function createChart(id, series, showLegend = true) {
                 type: "time", 
                 time: { tooltipFormat: "HH:mm" }, 
                 grid: { display: false },
-                ticks: { maxTicksLimit: 6 }
+                ticks: { maxTicksLimit: 6, display: showLegend },
+                border: { display: showLegend }
             },
             y: { 
-                grid: { color: "rgba(100, 100, 100, 0.1)", borderDash: [5, 5] },
-                beginAtZero: true
+                grid: { color: "rgba(100, 100, 100, 0.1)", borderDash: [5, 5] }
             }
         }
     };
@@ -232,29 +309,74 @@ async function loadHistory() {
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
         for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-c-grid${i}`] = [[]]; }
 
+        let firstTs = null;
+        let lastTs = null;
         data.forEach(d => {
             labels.push(d.ts);
+            if (!firstTs) firstTs = d.ts;
+            lastTs = d.ts;
+            
+            let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+            if (statusStr !== lastStatus && lastStatus !== null) {
+                statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
+            }
+            lastStatus = statusStr;
+
             ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
             ds.pv[0].push(d.pv1_w_mean); ds.pv[1].push(d.pv2_w_mean); ds.pv[2].push(d.pv3_w_mean); ds.pv[3].push(d.pv4_w_mean);
             ds.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
             ds.battery[0].push(d.bat_p_mean);
             
             for(let i=1; i<=4; i++) {
-                ds[`chart-v-pv${i}`][0].push(d[`pv${i}_v_mean`]);
-                ds[`chart-c-pv${i}`][0].push(d[`pv${i}_a_mean`]);
+                let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
+                ds[`chart-v-pv${i}`][0].push(v); ds[`chart-c-pv${i}`][0].push(c);
+                if(v < extremes.pv_v[i-1].min) extremes.pv_v[i-1].min = v;
+                if(v > extremes.pv_v[i-1].max) extremes.pv_v[i-1].max = v;
+                if(c < extremes.pv_c[i-1].min) extremes.pv_c[i-1].min = c;
+                if(c > extremes.pv_c[i-1].max) extremes.pv_c[i-1].max = c;
             }
             for(let i=1; i<=3; i++) {
-                ds[`chart-v-grid${i}`][0].push(d[`grid_l${i}_v_mean`]);
-                ds[`chart-c-grid${i}`][0].push(d[`grid_l${i}_a_mean`]);
+                let v = d[`grid_l${i}_v_mean`], c = d[`grid_l${i}_a_mean`];
+                ds[`chart-v-grid${i}`][0].push(v); ds[`chart-c-grid${i}`][0].push(c);
+                if(v < extremes.grid_v[i-1].min) extremes.grid_v[i-1].min = v;
+                if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
+                if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
+                if(c > extremes.grid_c[i-1].max) extremes.grid_c[i-1].max = c;
             }
         });
         
+        const flooredMin = Date.now() - 24 * 3600000;
+
+        // Apply global sync and datasets
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
+            charts[k].options.scales.x.min = flooredMin;
+            charts[k].options.plugins.annotation.annotations = Object.assign({}, statusAnnotations);
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
-            charts[k].update('none');
         });
+
+        // Sync axes Y and Min/Max labels
+        const pvVCharts = [1,2,3,4].map(i => charts[`chart-v-pv${i}`]);
+        const pvCCharts = [1,2,3,4].map(i => charts[`chart-c-pv${i}`]);
+        const gridVCharts = [1,2,3].map(i => charts[`chart-v-grid${i}`]);
+        const gridCCharts = [1,2,3].map(i => charts[`chart-c-grid${i}`]);
+        
+        syncChartScales(pvVCharts, extremes.pv_v, 0);
+        syncChartScales(pvCCharts, extremes.pv_c, 0);
+        syncChartScales(gridVCharts, extremes.grid_v, 0);
+        syncChartScales(gridCCharts, extremes.grid_c, 0);
+
+        for(let i=1; i<=4; i++) {
+            updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-pv${i}`], extremes.pv_c[i-1].min, extremes.pv_c[i-1].max, COLORS[`pv${i}`]);
+        }
+        for(let i=1; i<=3; i++) {
+            updateSparklineAnnotations(charts[`chart-v-grid${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-grid${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+        }
+        
+        Object.values(charts).forEach(c => { if(c) c.update('none'); });
     } catch(e) {}
 }
 
@@ -313,22 +435,62 @@ function connectSSE() {
         updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
 
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+        if (statusStr !== lastStatus && lastStatus !== null) {
+            statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
+            Object.values(charts).forEach(chart => {
+                if(chart) {
+                    chart.options.plugins.annotation.annotations = Object.assign({}, chart.options.plugins.annotation.annotations, statusAnnotations);
+                }
+            });
+        }
+        lastStatus = statusStr;
         updateDOM("meta-status", statusStr);
         
         for (let i = 1; i <= 4; i++) {
-            updateDOM(`pv${i}-c`, (d[`pv${i}_a`] || 0).toFixed(1)); // First letter of 'Current' is 'c'
-            updateDOM(`pv${i}-v`, (d[`pv${i}_v`] || 0).toFixed(1));
+            let v = d[`pv${i}_v`] || 0, c = d[`pv${i}_a`] || 0;
+            updateDOM(`pv${i}-c`, c.toFixed(1)); 
+            updateDOM(`pv${i}-v`, v.toFixed(1));
+            pushChart(charts[`chart-v-pv${i}`], ts, [v]);
+            pushChart(charts[`chart-c-pv${i}`], ts, [c]);
             
-            pushChart(charts[`chart-v-pv${i}`], ts, [d[`pv${i}_v`] || 0]);
-            pushChart(charts[`chart-c-pv${i}`], ts, [d[`pv${i}_a`] || 0]);
+            if(v < extremes.pv_v[i-1].min) extremes.pv_v[i-1].min = v;
+            if(v > extremes.pv_v[i-1].max) extremes.pv_v[i-1].max = v;
+            if(c < extremes.pv_c[i-1].min) extremes.pv_c[i-1].min = c;
+            if(c > extremes.pv_c[i-1].max) extremes.pv_c[i-1].max = c;
         }
         for (let i = 1; i <= 3; i++) {
-            updateDOM(`grid${i}-c`, (d[`grid_l${i}_a`] || 0).toFixed(1)); // First letter of 'Current' is 'c'
-            updateDOM(`grid${i}-v`, (d[`grid_l${i}_v`] || 0).toFixed(1));
+            let v = d[`grid_l${i}_v`] || 0, c = d[`grid_l${i}_a`] || 0;
+            updateDOM(`grid${i}-c`, c.toFixed(1)); 
+            updateDOM(`grid${i}-v`, v.toFixed(1));
+            pushChart(charts[`chart-v-grid${i}`], ts, [v]);
+            pushChart(charts[`chart-c-grid${i}`], ts, [c]);
             
-            pushChart(charts[`chart-v-grid${i}`], ts, [d[`grid_l${i}_v`] || 0]);
-            pushChart(charts[`chart-c-grid${i}`], ts, [d[`grid_l${i}_a`] || 0]);
+            if(v < extremes.grid_v[i-1].min) extremes.grid_v[i-1].min = v;
+            if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
+            if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
+            if(c > extremes.grid_c[i-1].max) extremes.grid_c[i-1].max = c;
         }
+        
+        // Live Sync
+        const pvVCharts = [1,2,3,4].map(i => charts[`chart-v-pv${i}`]);
+        const pvCCharts = [1,2,3,4].map(i => charts[`chart-c-pv${i}`]);
+        const gridVCharts = [1,2,3].map(i => charts[`chart-v-grid${i}`]);
+        const gridCCharts = [1,2,3].map(i => charts[`chart-c-grid${i}`]);
+        syncChartScales(pvVCharts, extremes.pv_v, 0);
+        syncChartScales(pvCCharts, extremes.pv_c, 0);
+        syncChartScales(gridVCharts, extremes.grid_v, 0);
+        syncChartScales(gridCCharts, extremes.grid_c, 0);
+        
+        for(let i=1; i<=4; i++) {
+            updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-pv${i}`], extremes.pv_c[i-1].min, extremes.pv_c[i-1].max, COLORS[`pv${i}`]);
+        }
+        for(let i=1; i<=3; i++) {
+            updateSparklineAnnotations(charts[`chart-v-grid${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-grid${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+        }
+        
+        Object.values(charts).forEach(c => { if(c) c.update('none'); });
         
         const sl = document.getElementById("status-label");
         if(sl) sl.innerText = statusStr;
