@@ -166,12 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tab-btn-grid").addEventListener("click", () => switchTab("grid"));
     document.getElementById("tab-btn-battery").addEventListener("click", () => switchTab("battery"));
 
-    const toggleBtn = document.getElementById("theme-toggle");
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", cycleTheme);
-        const savedTheme = document.documentElement.dataset.theme || "light";
-        toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
-    }
+
     
     document.getElementById("history-range").addEventListener("change", (e) => {
         const hours = parseInt(e.target.value, 10);
