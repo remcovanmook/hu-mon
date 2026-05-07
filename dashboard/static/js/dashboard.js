@@ -128,10 +128,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
-    createGroup('pv-w-cards', 'Power', 'W', 4, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
-    createGroup('grid-w-cards', 'Power', 'W', 3, 'Grid');
 
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
@@ -231,8 +229,8 @@ async function loadHistory() {
         const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[]], battery: [[]] };
         
         // Initialize arrays for sparklines
-        for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; ds[`chart-p-pv${i}`] = [[]]; }
-        for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-c-grid${i}`] = [[]]; ds[`chart-p-grid${i}`] = [[]]; }
+        for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
+        for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-c-grid${i}`] = [[]]; }
 
         data.forEach(d => {
             labels.push(d.ts);
@@ -244,12 +242,10 @@ async function loadHistory() {
             for(let i=1; i<=4; i++) {
                 ds[`chart-v-pv${i}`][0].push(d[`pv${i}_v_mean`]);
                 ds[`chart-c-pv${i}`][0].push(d[`pv${i}_a_mean`]);
-                ds[`chart-p-pv${i}`][0].push(d[`pv${i}_w_mean`]);
             }
             for(let i=1; i<=3; i++) {
                 ds[`chart-v-grid${i}`][0].push(d[`grid_l${i}_v_mean`]);
                 ds[`chart-c-grid${i}`][0].push(d[`grid_l${i}_a_mean`]);
-                ds[`chart-p-grid${i}`][0].push(d[`grid_l${i}_v_mean`] * d[`grid_l${i}_a_mean`]);
             }
         });
         
@@ -320,22 +316,18 @@ function connectSSE() {
         updateDOM("meta-status", statusStr);
         
         for (let i = 1; i <= 4; i++) {
-            updateDOM(`pv${i}-a`, (d[`pv${i}_a`] || 0).toFixed(1)); // Note: id is still pv1-a from HTML
+            updateDOM(`pv${i}-c`, (d[`pv${i}_a`] || 0).toFixed(1)); // First letter of 'Current' is 'c'
             updateDOM(`pv${i}-v`, (d[`pv${i}_v`] || 0).toFixed(1));
-            updateDOM(`pv${i}-w`, (d[`pv${i}_w`] || 0).toFixed(0)); // Note: id is still pv1-w from HTML
             
             pushChart(charts[`chart-v-pv${i}`], ts, [d[`pv${i}_v`] || 0]);
             pushChart(charts[`chart-c-pv${i}`], ts, [d[`pv${i}_a`] || 0]);
-            pushChart(charts[`chart-p-pv${i}`], ts, [d[`pv${i}_w`] || 0]);
         }
         for (let i = 1; i <= 3; i++) {
-            updateDOM(`grid${i}-a`, (d[`grid_l${i}_a`] || 0).toFixed(1));
+            updateDOM(`grid${i}-c`, (d[`grid_l${i}_a`] || 0).toFixed(1)); // First letter of 'Current' is 'c'
             updateDOM(`grid${i}-v`, (d[`grid_l${i}_v`] || 0).toFixed(1));
-            updateDOM(`grid${i}-w`, Math.abs(d[`meter_l${i}_w`] || 0).toFixed(0));
             
             pushChart(charts[`chart-v-grid${i}`], ts, [d[`grid_l${i}_v`] || 0]);
             pushChart(charts[`chart-c-grid${i}`], ts, [d[`grid_l${i}_a`] || 0]);
-            pushChart(charts[`chart-p-grid${i}`], ts, [Math.abs(d[`meter_l${i}_w`] || 0)]);
         }
         
         const sl = document.getElementById("status-label");
