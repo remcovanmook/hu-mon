@@ -231,7 +231,7 @@ document.addEventListener("DOMContentLoaded", () => {
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
         { label: 'Grid Net (W)', color: COLORS.net },
-        { label: 'Load (W)', color: COLORS.load }
+        { label: 'EPS (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
         { label: 'Total', color: COLORS.delivered, borderWidth: 2 },
@@ -348,7 +348,7 @@ async function loadHistory(hours = 24) {
             }
             lastStatus = statusStr;
 
-            ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.load_p_mean));
+            ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.eps_p_mean));
             ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
             ds.battery[0].push(Math.round(d.bat_p_mean));
@@ -445,8 +445,8 @@ function connectSSE() {
             updateDOM("sum-bat-autonomy", "—");
         }
         
-        updateDOM("sum-load", d.load_p.toFixed(0));
-        updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
+        updateDOM("sum-load", d.eps_p.toFixed(0));
+        updateDOM("sum-load-today", "—");
         
         // Explicitly ignoring L1/L2/L3 house load splits since we cannot derive them purely from the Modbus data without assumptions
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
@@ -603,7 +603,7 @@ function connectSSE() {
         updateDOM("bat-w", d.bat_p.toFixed(0));
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
-        pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.load_p)]);
+        pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.eps_p)]);
         pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w), Math.round(d.pv4_w)]);
         pushChart(charts.grid, ts, [Math.round(-d.meter_total_w), Math.round(g1w), Math.round(g2w), Math.round(g3w)]);
         pushChart(charts.battery, ts, [Math.round(d.bat_p)]);
