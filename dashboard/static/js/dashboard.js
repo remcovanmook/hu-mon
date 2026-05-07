@@ -430,8 +430,8 @@ async function loadHistory(hours = 24) {
         // Sync axes Y and Min/Max labels
         const pvVCharts = [1,2,3,4].map(i => charts[`chart-v-pv${i}`]);
         const pvCCharts = [1,2,3,4].map(i => charts[`chart-c-pv${i}`]);
-        const gridVCharts = [1,2,3].map(i => charts[`chart-v-grid${i}`]);
-        const gridCCharts = [1,2,3].map(i => charts[`chart-c-grid${i}`]);
+        const gridVCharts = [1,2,3].map(i => charts[`chart-v-l${i}`]);
+        const gridCCharts = [1,2,3].map(i => charts[`chart-c-l${i}`]);
         
         syncChartScales(pvVCharts, extremes.pv_v, 0);
         syncChartScales(pvCCharts, extremes.pv_c, 0);
@@ -448,8 +448,8 @@ async function loadHistory(hours = 24) {
             updateSparklineAnnotations(charts[`chart-c-pv${i}`], extremes.pv_c[i-1].min, extremes.pv_c[i-1].max, COLORS[`pv${i}`]);
         }
         for(let i=1; i<=3; i++) {
-            updateSparklineAnnotations(charts[`chart-v-grid${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
-            updateSparklineAnnotations(charts[`chart-c-grid${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-l${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-l${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
