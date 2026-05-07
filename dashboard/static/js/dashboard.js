@@ -373,7 +373,7 @@ async function loadHistory(hours = 24) {
         data.forEach(d => {
             labels.push(d.ts);
             if (!firstTs) firstTs = d.ts;
-            lastTs = d.ts;
+
             
             let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
             if (statusStr !== lastStatus && lastStatus !== null) {
