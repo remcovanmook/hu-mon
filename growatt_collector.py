@@ -107,13 +107,16 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r2.isError(): raise ModbusIOException("Failed to read Segment 2 (3030)")
             time.sleep(0.05)
 
-            # Segment 4 (Meter/EPS) 3120-3128
-            r4 = client.read_input_registers(3120, count=9, device_id=1)
+            # Segment 4 (Meter/EPS) 3120-3159
+            r4 = client.read_input_registers(3120, count=40, device_id=1)
+            
+            # Segment 5 (Low Block Mirror Hunt) 0-124
+            r5 = client.read_input_registers(0, count=125, device_id=1)
             
             # Segment 3 (Battery) 3170-3189
             r3 = client.read_input_registers(3170, count=20, device_id=1)
 
-            if r1.isError() or r2.isError() or r3.isError() or r4.isError():
+            if r1.isError() or r2.isError() or r3.isError() or r4.isError() or r5.isError():
                 time.sleep(1)
                 continue
                 
@@ -213,6 +216,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             for i, val in enumerate(reg2): raw_dict[str(3030 + i)] = val
             for i, val in enumerate(reg4): raw_dict[str(3120 + i)] = val
             for i, val in enumerate(reg3): raw_dict[str(3170 + i)] = val
+            for i, val in enumerate(r5.registers): raw_dict[str(i)] = val
             reading.raw_payload = json.dumps(raw_dict).encode('utf-8')
 
             import dataclasses
