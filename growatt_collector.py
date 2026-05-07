@@ -141,40 +141,29 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.pv4_a = parse_u16(reg1[16]) / 10.0
             reading.pv4_w = parse_u32(reg1[17], reg1[18]) / 10.0
             
-            reading.grid_l1_v = parse_u16(reg2[0]) / 10.0
-            reading.grid_l1_a = parse_u16(reg2[1]) / 10.0
-            reading.grid_l2_v = parse_u16(reg2[4]) / 10.0
-            reading.grid_l2_a = parse_u16(reg2[5]) / 10.0
+            # Auto-detect Frankenstein Shifted Profile using Frequency North Star
+            # If Freq is at 3025 and L1 V is at 3026, the entire grid block is shifted.
+            freq_3025 = parse_u16(reg1[25]) if len(reg1) > 25 else 0
+            v_3026 = parse_u16(reg1[26]) if len(reg1) > 26 else 0
             
-            v_l1 = parse_u16(reg2[0])
-            v_l2 = parse_u16(reg2[4])
-            v_3038 = parse_u16(reg2[8])
-            
-            ratio = v_3038 / v_l1 if v_l1 > 0 else 0
-            
-            if 1.6 < ratio < 1.85:
-                # Frankenstein Profile: L3 V/A are physically missing from the Modbus map.
-                # 3048/3049 are part of 32-bit energy counters (Eac Today).
-                # We must approximate L3 metrics to keep the dashboard topology intact.
-                
-                # Approximate L3 Voltage as average of L1 and L2
-                reading.grid_l3_v = ((v_l1 + v_l2) / 2.0) / 10.0
-                
-                # Derive L3 Current from the power balance
-                # Total AC Power (Pac) is at 3024
-                # L1 Power is 3033, L2 Power is 3037
-                total_ac_p = parse_u32(reg1[24], reg1[25]) / 10.0
-                l1_p = parse_u32(reg2[2], reg2[3]) / 10.0
-                l2_p = parse_u32(reg2[6], reg2[7]) / 10.0
-                
-                l3_p = max(0, total_ac_p - l1_p - l2_p)
-                reading.grid_l3_a = (l3_p / reading.grid_l3_v) if reading.grid_l3_v > 0 else 0.0
+            if freq_3025 > 4000 and v_3026 > 1000:
+                # Shifted Profile
+                reading.grid_freq = freq_3025 / 100.0
+                reading.grid_l1_v = v_3026 / 10.0
+                reading.grid_l1_a = parse_u16(reg1[27]) / 10.0
+                reading.grid_l2_v = parse_u16(reg2[0]) / 10.0
+                reading.grid_l2_a = parse_u16(reg2[1]) / 10.0
+                reading.grid_l3_v = parse_u16(reg2[4]) / 10.0
+                reading.grid_l3_a = parse_u16(reg2[5]) / 10.0
             else:
                 # Standard Profile
+                reading.grid_freq = parse_u16(reg2[12]) / 100.0
+                reading.grid_l1_v = parse_u16(reg2[0]) / 10.0
+                reading.grid_l1_a = parse_u16(reg2[1]) / 10.0
+                reading.grid_l2_v = parse_u16(reg2[4]) / 10.0
+                reading.grid_l2_a = parse_u16(reg2[5]) / 10.0
                 reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
                 reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
-                
-            reading.grid_freq = parse_u16(reg2[12]) / 100.0
             
 
             
