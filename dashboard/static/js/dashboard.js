@@ -268,8 +268,8 @@ function connectSSE() {
         updateDOM("meta-fw", d.inverter_firmware);
         updateDOM("meta-logger", d.datalogger_model || "—");
         updateDOM("meta-signal", (d.signal_quality ? d.signal_quality + "%" : "—"));
-        updateDOM("meta-e-today", d.epv_today_kwh.toFixed(1) + " kWh");
-        updateDOM("meta-e-total", d.epv_total_kwh.toFixed(1) + " kWh");
+        updateDOM("meta-e-today", d.pv_today_kwh.toFixed(1) + " kWh");
+        updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
 
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
         updateDOM("meta-status", statusStr);

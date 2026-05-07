@@ -173,7 +173,14 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             
             # Datalogger
             logger_type = reg5[8]
-            reading.signal_quality = reg5[10]
+            
+            # Signal quality is often packed in the low byte, high byte contains state flags
+            raw_signal = reg5[10]
+            if raw_signal > 100:
+                reading.signal_quality = raw_signal & 0x00FF
+            else:
+                reading.signal_quality = raw_signal
+                
             if logger_type == 15:
                 reading.datalogger_model = "ShineWifi-X2"
             elif logger_type == 10:
