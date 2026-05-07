@@ -45,6 +45,16 @@ Start the full stack (Collector, Proxy, Dashboard, Metrics) by pointing it at yo
 - `--http-port`: The port for the web dashboard and metrics (default 8080).
 - `--db`: SQLite database file (default `growatt.db`).
 
+**MQTT Integration (Optional):**
+- `--mqtt-host`: MQTT broker IP. (Requires `pip install aiomqtt`)
+- `--mqtt-port`: MQTT broker port (default 1883).
+- `--mqtt-user` / `--mqtt-pass`: Optional credentials.
+
+**InfluxDB Integration (Optional):**
+- `--influx-url`: Base URL of InfluxDB (e.g. `http://localhost:8086`).
+- `--influx-token`, `--influx-org`, `--influx-bucket`: For InfluxDB v2.
+- `--influx-db`: For InfluxDB v1 (default `growatt`).
+
 ## Testing
 
 Run the test suite to verify Modbus parsing math and SQLite moving average logic:

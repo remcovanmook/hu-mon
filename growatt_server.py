@@ -21,6 +21,20 @@ def main():
     parser.add_argument("--proxy-port", type=int, default=5020)
     parser.add_argument("--http-port", type=int, default=8080)
     parser.add_argument("--db", default="growatt.db")
+    
+    # MQTT Options
+    parser.add_argument("--mqtt-host", default="")
+    parser.add_argument("--mqtt-port", type=int, default=1883)
+    parser.add_argument("--mqtt-user", default="")
+    parser.add_argument("--mqtt-pass", default="")
+    
+    # InfluxDB Options
+    parser.add_argument("--influx-url", default="")
+    parser.add_argument("--influx-token", default="")
+    parser.add_argument("--influx-org", default="")
+    parser.add_argument("--influx-bucket", default="")
+    parser.add_argument("--influx-db", default="growatt")
+    
     args = parser.parse_args()
 
     store = GrowattStore(args.db)
@@ -43,7 +57,28 @@ def main():
     ).start()
     logger.info("Modbus proxy server started on port %d", args.proxy_port)
 
-    # 3. Run Flask dashboard blocking in main thread (matching hegg-emon pattern)
+    # 3. Start MQTT Exporter (Optional)
+    if args.mqtt_host:
+        from growatt.mqtt_publisher import run as run_mqtt
+        threading.Thread(
+            target=run_mqtt,
+            args=(store, args.mqtt_host, args.mqtt_port, args.mqtt_user, args.mqtt_pass),
+            daemon=True,
+            name="growatt-mqtt"
+        ).start()
+
+    # 4. Start InfluxDB Exporter (Optional)
+    if args.influx_url:
+        from growatt.influx_publisher import run_influx_loop
+        threading.Thread(
+            target=run_influx_loop,
+            args=(store, args.influx_url, args.influx_token, args.influx_org, args.influx_bucket, args.influx_db),
+            daemon=True,
+            name="growatt-influx"
+        ).start()
+        logger.info("InfluxDB exporter started targeting %s", args.influx_url)
+
+    # 5. Run Flask dashboard blocking in main thread (matching hegg-emon pattern)
     application = create_app(store)
     logger.info("Dashboard and metrics on http://0.0.0.0:%d/", args.http_port)
     try:
