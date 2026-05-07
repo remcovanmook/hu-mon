@@ -501,7 +501,7 @@ function connectSSE() {
         }
         for (let i = 1; i <= 3; i++) {
             let v = d[`grid_l${i}_v`] || 0, c = d[`grid_l${i}_a`] || 0;
-            updateDOM(`l${i}-a`, c.toFixed(1)); 
+            updateDOM(`l${i}-c`, c.toFixed(1)); 
             updateDOM(`l${i}-v`, v.toFixed(1));
             pushChart(charts[`chart-v-l${i}`], ts, [v]);
             pushChart(charts[`chart-c-l${i}`], ts, [c]);
@@ -597,7 +597,7 @@ function connectSSE() {
         const g3w = d.grid_l3_v * d.grid_l3_a;
         for(let i=1; i<=3; i++) {
             updateDOM(`l${i}-v`, d[`grid_l${i}_v`].toFixed(1));
-            updateDOM(`l${i}-a`, d[`grid_l${i}_a`].toFixed(1));
+            updateDOM(`l${i}-c`, d[`grid_l${i}_a`].toFixed(1));
         }
         updateDOM(`l1-w`, g1w.toFixed(0));
         updateDOM(`l2-w`, g2w.toFixed(0));
