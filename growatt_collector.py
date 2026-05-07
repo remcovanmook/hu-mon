@@ -119,6 +119,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_import_today_kwh = parse_u32(reg3[14], reg3[15]) / 10.0
             reading.grid_export_today_kwh = parse_u32(reg3[16], reg3[17]) / 10.0
             reading.load_today_kwh = parse_u32(reg3[18], reg3[19]) / 10.0
+            reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
+            reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
             
             # Use native house load register (3048-49)
             reading.load_p = parse_u32(reg2[18], reg2[19]) / 10.0

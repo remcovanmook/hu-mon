@@ -52,6 +52,8 @@ class GrowattReading:
     grid_import_today_kwh: float = 0.0
     grid_export_today_kwh: float = 0.0
     load_today_kwh: float = 0.0
+    bat_charge_today_kwh: float = 0.0
+    bat_discharge_today_kwh: float = 0.0
 
     
     # Raw payload cache for the Proxy

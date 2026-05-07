@@ -1,4 +1,4 @@
-
+JS = """
 "use strict";
 
 const charts = {};
@@ -193,87 +193,15 @@ function connectSSE() {
         const d = JSON.parse(e.data);
         const ts = d.ts;
         
-        
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
-        updateDOM("sum-pv-today", d.pv_today_kwh.toFixed(1));
-        updateDOM("sum-pv-total", d.pv_total_kwh.toFixed(0));
-
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
         updateDOM("sum-grid-stat", d.meter_total_w >= 0 ? "Exporting" : "Importing");
-        updateDOM("sum-grid-today", d.meter_total_w >= 0 ? d.grid_export_today_kwh.toFixed(1) : d.grid_import_today_kwh.toFixed(1));
-        // Hardcode "total ever" until we add it, or just show Export for now
-        updateDOM("sum-grid-total", d.grid_export_today_kwh.toFixed(0));
-
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        
-        if (d.bat_nominal_kwh > 0) {
-            const bat_kwh = (d.bat_soc / 100.0) * d.bat_nominal_kwh;
-            updateDOM("sum-bat-kwh", bat_kwh.toFixed(1));
-            const autonomy = d.load_p > 0 ? (bat_kwh * 1000 / d.load_p).toFixed(1) : "—";
-            updateDOM("sum-bat-autonomy", autonomy);
-        } else {
-            updateDOM("sum-bat-kwh", "—");
-            updateDOM("sum-bat-autonomy", "—");
-        }
-        
+        updateDOM("sum-bat-stat", Math.abs(d.bat_p).toFixed(0) + " W");
+        updateDOM("sum-bat-w", d.bat_p.toFixed(0));
         updateDOM("sum-load", d.load_p.toFixed(0));
-        updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
-        
-        // Exact per-phase load derived from meter phase data + symmetric inverter assumption
-        const inv_per_phase = (d.load_p + d.meter_total_w) / 3;
-        updateDOM("sum-load-l1", (inv_per_phase - (d.meter_l1_w || 0)).toFixed(0));
-        updateDOM("sum-load-l2", (inv_per_phase - (d.meter_l2_w || 0)).toFixed(0));
-        updateDOM("sum-load-l3", (inv_per_phase - (d.meter_l3_w || 0)).toFixed(0));
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
-
-
-        
-        // --- Cute Flow Diagram Animation ---
-        updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
-        updateDOM("flow-grid", Math.abs(d.meter_total_w).toFixed(0) + " W");
-        updateDOM("flow-bat", Math.abs(d.bat_p).toFixed(0) + " W");
-        updateDOM("flow-load", d.load_p.toFixed(0) + " W");
-
-        const lPvInv = document.getElementById("line-pv-inv");
-        const lInvGrid = document.getElementById("line-inv-grid");
-        const lInvBat = document.getElementById("line-inv-bat");
-        const lInvLoad = document.getElementById("line-inv-load");
-
-        if(lPvInv) {
-            lPvInv.classList.toggle("active", d.pv_total_w > 10);
-        }
-        if(lInvGrid) {
-            lInvGrid.classList.toggle("active", Math.abs(d.meter_total_w) > 10);
-            if (d.meter_total_w > 0) {
-                lInvGrid.classList.add("export"); // Reverse animation
-            } else {
-                lInvGrid.classList.remove("export");
-            }
-        }
-        if(lInvBat) {
-            lInvBat.classList.toggle("active", Math.abs(d.bat_p) > 10);
-            if (d.bat_p < 0) {
-                lInvBat.classList.add("export"); // Discharging is toward inverter
-            } else {
-                lInvBat.classList.remove("export");
-            }
-        }
-        if(lInvLoad) {
-            lInvLoad.classList.toggle("active", d.load_p > 10);
-        }
-
-        // Overview Totals (Row under chart)
-        updateDOM("ov-pv-today", d.pv_today_kwh.toFixed(1));
-        updateDOM("ov-grid-in-today", d.grid_import_today_kwh.toFixed(1));
-        updateDOM("ov-load-today", d.load_today_kwh.toFixed(1));
-        updateDOM("ov-bat-in-today", d.bat_charge_today_kwh.toFixed(1));
-
-        // Power net val
-        updateDOM("power-net-val", Math.abs(d.meter_total_w).toFixed(0));
-        updateDOM("power-direction", d.meter_total_w >= 0 ? "Exporting" : "Importing");
-        
-        // --- End Flow Diagram ---
 
         for(let i=1; i<=4; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
@@ -303,3 +231,6 @@ function connectSSE() {
         pushChart(charts.battery, ts, [d.bat_p]);
     });
 }
+"""
+with open("dashboard/static/js/dashboard.js", "w") as f:
+    f.write(JS)

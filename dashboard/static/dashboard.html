@@ -129,377 +129,110 @@
       </div>
     </section>
 
-    <!-- ── Tab bar ─────────────────────────────────────────────────────── -->
-        <nav class="tab-bar" role="tablist" aria-label="Dashboard view">
+        <!-- ── Tab bar ─────────────────────────────────────────────────────── -->
+    <nav class="tab-bar" role="tablist" aria-label="Dashboard view">
       <button class="tab-btn tab-btn--active" id="tab-btn-overview" role="tab" aria-selected="true" aria-controls="tab-overview">Overview</button>
       <button class="tab-btn" id="tab-btn-pv" role="tab" aria-selected="false" aria-controls="tab-pv">PV Power</button>
       <button class="tab-btn" id="tab-btn-grid" role="tab" aria-selected="false" aria-controls="tab-grid">Grid Power</button>
       <button class="tab-btn" id="tab-btn-battery" role="tab" aria-selected="false" aria-controls="tab-battery">Battery Power</button>
     </nav>
 
-    <!-- ══ Tab 1: Electricity ══════════════════════════════════════════════ -->
-    <div id="tab-electricity" role="tabpanel" aria-labelledby="tab-btn-electricity">
-
-      <!-- ── Power ── -->
-      <section class="section" aria-labelledby="power-heading">
-        <h2 id="power-heading" class="section-title">Power</h2>
-        <div class="chart-card" id="power-display">
-          <div class="power-card-header">
-            <div class="power-card-headline">
-              <span class="power-direction" id="power-direction">—</span>
-              <span class="power-value mono" id="power-net-val">—</span>
-              <span class="power-unit">W</span>
-            </div>
-            <div class="power-card-deltas">
-              <span class="power-delta-in" id="power-delta-in"></span>
-              <span class="power-delta-out" id="power-delta-out"></span>
-            </div>
+    <!-- ══ Tab 1: Overview ══════════════════════════════════════════════ -->
+    <div id="tab-overview" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-overview">
+      <div class="power-flow">
+        <div class="flow-container">
+          <div class="flow-node" id="node-pv">
+            <span class="icon">☀️</span><span class="label">PV Array</span><span class="val" id="flow-pv">0 W</span>
           </div>
-          <div class="chart-wrapper"><canvas id="chart-power" aria-label="Net power history"></canvas></div>
-        </div>
-      </section>
-
-      <!-- ── Voltage ── -->
-      <section class="section" aria-labelledby="voltage-heading">
-        <h2 id="voltage-heading" class="section-title">Voltage</h2>
-        <div class="cards-row cards-row--three">
-          <article class="card card--phase card--with-chart" id="card-v-l1">
-            <div class="phase-row">
-              <div class="phase-badge">L1</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="voltage-l1">—</div>
-                <div class="card-unit">V</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-v-l1" aria-label="L1 voltage history"></canvas>
-            </div>
-          </article>
-          <article class="card card--phase card--with-chart" id="card-v-l2">
-            <div class="phase-row">
-              <div class="phase-badge">L2</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="voltage-l2">—</div>
-                <div class="card-unit">V</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-v-l2" aria-label="L2 voltage history"></canvas>
-            </div>
-          </article>
-          <article class="card card--phase card--with-chart" id="card-v-l3">
-            <div class="phase-row">
-              <div class="phase-badge">L3</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="voltage-l3">—</div>
-                <div class="card-unit">V</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-v-l3" aria-label="L3 voltage history"></canvas>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <!-- ── Current ── -->
-      <section class="section" aria-labelledby="current-heading">
-        <h2 id="current-heading" class="section-title">Current</h2>
-        <div class="cards-row cards-row--three">
-          <article class="card card--phase card--with-chart" id="card-c-l1">
-            <div class="phase-row">
-              <div class="phase-badge">L1</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="current-l1">—</div>
-                <div class="card-unit">A</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-c-l1" aria-label="L1 current history"></canvas>
-            </div>
-          </article>
-          <article class="card card--phase card--with-chart" id="card-c-l2">
-            <div class="phase-row">
-              <div class="phase-badge">L2</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="current-l2">—</div>
-                <div class="card-unit">A</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-c-l2" aria-label="L2 current history"></canvas>
-            </div>
-          </article>
-          <article class="card card--phase card--with-chart" id="card-c-l3">
-            <div class="phase-row">
-              <div class="phase-badge">L3</div>
-              <div class="phase-value-group">
-                <div class="card-value" id="current-l3">—</div>
-                <div class="card-unit">A</div>
-              </div>
-            </div>
-            <div class="chart-wrapper chart-wrapper--inline">
-              <canvas id="chart-c-l3" aria-label="L3 current history"></canvas>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <!-- ── 3-phase wye phasor diagram ── -->
-      <section class="section" aria-labelledby="wye-heading">
-        <h2 id="wye-heading" class="section-title">3-Phase Wye System</h2>
-        <div class="chart-card wye-card">
-          <div class="wye-layout">
-
-            <div class="wye-diagram-wrap" aria-label="3-phase phasor diagram">
-              <canvas id="wye-canvas" aria-label="Wye phasor diagram"></canvas>
-            </div>
-
-            <div class="wye-stats">
-
-              <div class="wye-stats-group">
-                <div class="wye-stats-header">Phase voltages</div>
-                <table class="wye-table" id="wye-phase-table">
-                  <thead><tr><th class="sr-only" scope="col">Phase</th><th class="sr-only" scope="col">Voltage</th><th class="sr-only" scope="col">Unit</th><th class="sr-only" scope="col">IEC delta</th></tr></thead>
-                  <tbody>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l1"></span>L1</td>
-                      <td class="wt-val mono" id="wye-v-l1">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l1"></td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l2"></span>L2</td>
-                      <td class="wt-val mono" id="wye-v-l2">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l2"></td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l3"></span>L3</td>
-                      <td class="wt-val mono" id="wye-v-l3">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l3"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="wye-stats-group">
-                <div class="wye-stats-header">Line differentials</div>
-                <table class="wye-table">
-                  <thead><tr><th class="sr-only" scope="col">Phase pair</th><th class="sr-only" scope="col">Voltage</th><th class="sr-only" scope="col">Unit</th><th class="sr-only" scope="col">IEC delta</th></tr></thead>
-                  <tbody>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l12"></span>L1–L2</td>
-                      <td class="wt-val mono" id="wye-diff-l12">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l12"></td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l13"></span>L1–L3</td>
-                      <td class="wt-val mono" id="wye-diff-l13">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l13"></td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label"><span class="wye-dot wye-dot--l23"></span>L2–L3</td>
-                      <td class="wt-val mono" id="wye-diff-l23">—</td>
-                      <td class="wt-unit">V</td>
-                      <td class="wt-ideal" id="wye-ideal-l23"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="wye-stats-group">
-                <div class="wye-stats-header">Neutral offset</div>
-                <table class="wye-table">
-                  <thead><tr><th class="sr-only" scope="col">Metric</th><th class="sr-only" scope="col">Value</th><th class="sr-only" scope="col">Unit</th><th class="sr-only" scope="col">Diagram</th></tr></thead>
-                  <tbody>
-                    <tr>
-                      <td class="wt-label">Magnitude</td>
-                      <td class="wt-val" id="wye-neutral-mag">—</td>
-                      <td class="wt-unit">V</td>
-                      <!-- Canvas spans 4 rows; the 4th empty row absorbs excess height -->
-                      <td class="wt-ideal wt-canvas-cell" rowspan="4">
-                        <div class="wye-neutral-mini-wrap">
-                          <canvas id="wye-neutral-canvas" aria-label="Neutral offset polar diagram"></canvas>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label">Angle</td>
-                      <td class="wt-val" id="wye-neutral-ang">—</td>
-                      <td class="wt-unit">°</td>
-                    </tr>
-                    <tr>
-                      <td class="wt-label">Imbalance</td>
-                      <td class="wt-val" id="wye-imbalance">—</td>
-                      <td class="wt-unit">%</td>
-                    </tr>
-                    <tr><td colspan="3" class="wt-absorber"></td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-            </div><!-- /.wye-stats -->
-
-          </div><!-- /.wye-layout -->
-        </div><!-- /.chart-card -->
-      </section>
-
-    </div><!-- /#tab-electricity -->
-
-    <!-- ══ Tab 2: Usage & Cost ════════════════════════════════════════════ -->
-    <div id="tab-usage" role="tabpanel" aria-labelledby="tab-btn-usage" hidden>
-
-      <!-- Electricity usage: kWh/h per tariff -->
-      <section class="section" aria-labelledby="usage-elec-heading">
-        <h2 id="usage-elec-heading" class="section-title">Electricity Usage</h2>
-        <div class="chart-card">
-          <div class="power-card-header">
-            <div class="power-card-headline">
-              <span class="power-direction">Net usage</span>
-              <span class="power-value mono" id="usage-net-val">—</span>
-              <span class="power-unit">kWh</span>
-            </div>
-            <div class="power-card-deltas">
-              <span class="power-delta-in"  id="usage-delta-in"></span>
-              <span class="power-delta-out" id="usage-delta-out"></span>
-            </div>
+          <div class="flow-node" id="node-inv">
+            <span class="icon">⚡</span><span class="label">Inverter</span><span class="val" id="flow-inv">Live</span>
           </div>
-          <div class="chart-wrapper chart-wrapper--cost">
-            <canvas id="chart-usage" aria-label="Hourly electricity usage per tariff"></canvas>
+          <div class="flow-node" id="node-grid">
+            <span class="icon">🏢</span><span class="label">Grid</span><span class="val" id="flow-grid">0 W</span>
+          </div>
+          <div class="flow-node" id="node-bat">
+            <span class="icon">🔋</span><span class="label">Battery</span><span class="val" id="flow-bat">0 W</span>
+          </div>
+          <div class="flow-node" id="node-load">
+            <span class="icon">🏠</span><span class="label">Load</span><span class="val" id="flow-load">0 W</span>
+          </div>
+          <svg class="flow-lines">
+            <path d="M 120 70 L 340 70" class="flow-line" id="line-pv-inv" />
+            <path d="M 460 70 L 680 70" class="flow-line" id="line-inv-grid" />
+            <path d="M 400 120 L 400 230 L 280 230" class="flow-line" id="line-inv-bat" />
+            <path d="M 400 120 L 400 230 L 520 230" class="flow-line" id="line-inv-load" />
+          </svg>
+        </div>
+      </div>
+      
+      <div class="chart-card" id="power-display">
+        <div class="power-card-header">
+          <div class="power-card-headline">
+            <span class="power-direction" id="power-direction">Net Power</span>
+            <span class="power-value mono" id="power-net-val">—</span>
+            <span class="power-unit">W</span>
+          </div>
+          <div class="power-card-deltas">
+            <span class="power-delta-in" id="power-delta-in"></span>
+            <span class="power-delta-out" id="power-delta-out"></span>
           </div>
         </div>
-      </section>
+        <div class="chart-wrapper"><canvas id="chart-power" aria-label="Net power history"></canvas></div>
+      </div>
+      
+      <div class="cards-row cards-row--four" style="margin-top: 1rem;">
+        <article class="card">
+          <div class="card-label">Energy Produced Today</div>
+          <div class="card-value"><span id="ov-pv-today">—</span> kWh</div>
+        </article>
+        <article class="card">
+          <div class="card-label">Grid Imported Today</div>
+          <div class="card-value"><span id="ov-grid-in-today">—</span> kWh</div>
+        </article>
+        <article class="card">
+          <div class="card-label">Battery Charged Today</div>
+          <div class="card-value"><span id="ov-bat-in-today">—</span> kWh</div>
+        </article>
+        <article class="card">
+          <div class="card-label">Energy Consumed Today</div>
+          <div class="card-value"><span id="ov-load-today">—</span> kWh</div>
+        </article>
+      </div>
+    </div><!-- /#tab-overview -->
 
-      <!-- Electricity cost: €/h -->
-      <section class="section" aria-labelledby="cost-heading">
-        <h2 id="cost-heading" class="section-title">Electricity Cost</h2>
-        <div class="chart-card">
-          <div class="power-card-header">
-            <div class="power-card-headline">
-              <span class="power-direction">Net cost</span>
-              <span class="power-value mono cost-import" id="cost-net-total">—</span>
-              <span class="power-unit">&euro;</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end;">
-              <div class="power-card-deltas">
-                <span class="power-delta-in"  id="cost-delta-in"></span>
-                <span class="power-delta-out" id="cost-delta-out"></span>
-              </div>
-              <div id="cost-elec-breakdown" style="font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 4px;"></div>
-            </div>
-          </div>
-          <div class="chart-wrapper chart-wrapper--cost">
-            <canvas id="chart-cost" aria-label="Hourly electricity cost"></canvas>
-          </div>
-        </div>
-      </section>
+    <!-- ══ Tab 2: PV Power ══════════════════════════════════════════════ -->
+    <div id="tab-pv" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-pv" hidden>
+      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-pv"></canvas></div></div>
+      <h3 class="section-title">PV Voltage</h3>
+      <div class="cards-row cards-row--four" id="pv-v-cards"></div>
+      <h3 class="section-title">PV Current</h3>
+      <div class="cards-row cards-row--four" id="pv-a-cards"></div>
+      <h3 class="section-title">PV Power</h3>
+      <div class="cards-row cards-row--four" id="pv-w-cards"></div>
+    </div><!-- /#tab-pv -->
 
-      <!-- Gas usage: m³/h -->
-      <section class="section" aria-labelledby="gas-heading">
-        <h2 id="gas-heading" class="section-title">Gas Usage</h2>
-        <div class="chart-card">
-          <div class="power-card-header">
-            <div class="power-card-headline">
-              <span class="power-direction">Gas used</span>
-              <span class="power-value mono" id="gas-total-val">—</span>
-              <span class="power-unit">m&sup3;</span>
-            </div>
+    <!-- ══ Tab 3: Grid Power ════════════════════════════════════════════ -->
+    <div id="tab-grid" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-grid" hidden>
+      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-grid"></canvas></div></div>
+      <h3 class="section-title">Grid Voltage</h3>
+      <div class="cards-row cards-row--three" id="grid-v-cards"></div>
+      <h3 class="section-title">Grid Current</h3>
+      <div class="cards-row cards-row--three" id="grid-a-cards"></div>
+      <h3 class="section-title">Grid Power</h3>
+      <div class="cards-row cards-row--three" id="grid-w-cards"></div>
+    </div><!-- /#tab-grid -->
 
-          </div>
-          <div class="chart-wrapper chart-wrapper--cost">
-            <canvas id="chart-gas" aria-label="Hourly gas usage"></canvas>
-          </div>
-        </div>
-      </section>
-
-      <!-- Gas cost: eur -->
-      <section class="section" aria-labelledby="gas-cost-heading">
-        <h2 id="gas-cost-heading" class="section-title">Gas Cost</h2>
-        <div class="chart-card">
-          <div class="power-card-header">
-            <div class="power-card-headline">
-              <span class="power-direction">Gas cost</span>
-              <span class="power-value mono cost-import" id="cost-gas-total">—</span>
-              <span class="power-unit">&euro;</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end;">
-              <div class="power-card-deltas" style="min-height: 0;"></div>
-              <div id="cost-gas-breakdown" style="font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-top: 4px;"></div>
-            </div>
-          </div>
-          <div class="chart-wrapper chart-wrapper--cost">
-            <canvas id="chart-gas-cost" aria-label="Hourly gas cost"></canvas>
-          </div>
-        </div>
-      </section>
-
-    </div><!-- /#tab-usage -->
-
-    <!-- ══ Tab 3: Forecast & Pricing ═══════════════════════════════════════ -->
-    <div id="tab-forecast" role="tabpanel" aria-labelledby="tab-btn-forecast" hidden>
-      <section class="section" aria-labelledby="forecast-heading">
-        <h2 id="forecast-heading" class="section-title">Day-Ahead Outlook</h2>
-        <div class="cards-row cards-row--two" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px;">
-          <div class="chart-card" style="margin-top: 0;">
-            <div class="power-card-header">
-              <div class="power-card-headline">
-                <span class="power-direction">Electricity</span>
-              </div>
-              <div class="power-card-deltas">
-                <span style="color: var(--delivered-color)" id="current-elec-price">—</span>
-              </div>
-            </div>
-            <div class="chart-wrapper" style="height: 200px;">
-              <canvas id="chart-forecast-elec" aria-label="Forecasted electricity prices"></canvas>
-            </div>
-          </div>
-
-          <div class="chart-card" style="margin-top: 0;">
-            <div class="power-card-header">
-              <div class="power-card-headline">
-                <span class="power-direction">Gas</span>
-              </div>
-              <div class="power-card-deltas">
-                <span style="color: var(--returned-color)" id="current-gas-price">—</span>
-              </div>
-            </div>
-            <div class="chart-wrapper" style="height: 200px;">
-              <canvas id="chart-forecast-gas" aria-label="Forecasted gas prices"></canvas>
-            </div>
-          </div>
-
-          <div class="chart-card" style="margin-top: 0;">
-            <div class="power-card-header">
-              <div class="power-card-headline">
-                <span class="power-direction">Temperature</span>
-              </div>
-              <div class="power-card-deltas">
-                <span style="color: var(--voltage-color, #8b5cf6)" id="current-temp">—</span>
-              </div>
-            </div>
-            <div class="chart-wrapper" style="height: 200px;">
-              <canvas id="chart-forecast-temp" aria-label="Temperature forecast"></canvas>
-            </div>
-          </div>
-
-          <div class="chart-card" style="margin-top: 0;">
-            <div class="power-card-header">
-              <div class="power-card-headline">
-                <span class="power-direction">Solar Radiation</span>
-              </div>
-            </div>
-            <div class="chart-wrapper" style="height: 200px;">
-              <canvas id="chart-forecast-solar" aria-label="Solar forecast"></canvas>
-            </div>
-          </div>
-        </div>
-    </div><!-- /#tab-forecast -->
-
-  </main>
+    <!-- ══ Tab 4: Battery Power ══════════════════════════════════════════ -->
+    <div id="tab-battery" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-battery" hidden>
+      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-battery"></canvas></div></div>
+      <div class="cards-row cards-row--four">
+        <article class="card"><div class="card-label">Battery Voltage</div><div class="card-value" id="bat-v">— V</div></article>
+        <article class="card"><div class="card-label">Battery Current</div><div class="card-value" id="bat-a">— A</div></article>
+        <article class="card"><div class="card-label">Battery Power</div><div class="card-value" id="bat-w">— W</div></article>
+        <article class="card"><div class="card-label">Battery SOC</div><div class="card-value" id="bat-soc2">— %</div></article>
+      </div>
+    </div><!-- /#tab-battery -->
+</main>
 
   <footer class="footer"></footer>
 
