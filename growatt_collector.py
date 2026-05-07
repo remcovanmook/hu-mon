@@ -114,16 +114,20 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.bat_p = parse_s32(reg3[3], reg3[4]) / 10.0
             
             # Energy Counters
-            reading.pv_today_kwh = parse_u32(reg2[23], reg2[24]) / 10.0
-            reading.pv_total_kwh = parse_u32(reg2[25], reg2[26]) / 10.0
+            reading.pv_today_kwh = parse_u32(reg2[19], reg2[20]) / 10.0     # 3049-3050
+            reading.pv_total_kwh = parse_u32(reg2[21], reg2[22]) / 10.0     # 3051-3052
+            
+            # Additional AC Energy counters if needed later (3053-3056)
+            # reading.eac_today = parse_u32(reg2[23], reg2[24]) / 10.0
+            
             reading.grid_import_today_kwh = parse_u32(reg3[14], reg3[15]) / 10.0
             reading.grid_export_today_kwh = parse_u32(reg3[16], reg3[17]) / 10.0
             reading.load_today_kwh = parse_u32(reg3[18], reg3[19]) / 10.0
             reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
             reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
             
-            # Use native house load register (3048-49)
-            reading.load_p = parse_u32(reg2[18], reg2[19]) / 10.0
+            # Mathematically derive instantaneous load (safest and most accurate)
+            reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
             reading.bat_nominal_kwh = bat_nominal_kwh
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
@@ -133,6 +137,12 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             for i, val in enumerate(reg4): raw_dict[str(3120 + i)] = val
             for i, val in enumerate(reg3): raw_dict[str(3170 + i)] = val
             reading.raw_payload = json.dumps(raw_dict).encode('utf-8')
+
+            import dataclasses
+            with open("debug_reading.json", "w") as f:
+                d = {f.name: getattr(reading, f.name) for f in dataclasses.fields(reading)}
+                d["raw_payload"] = "hidden"
+                json.dump(d, f, indent=2)
 
             store.insert(reading)
 
