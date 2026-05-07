@@ -190,70 +190,48 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const colorMap = {
             'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
-            'L': [COLORS.l1, COLORS.l2, COLORS.l3]
+            'Grid': [COLORS.l1, COLORS.l2, COLORS.l3]
         };
 
         let html = '';
         for(let i=1; i<=count; i++) {
             const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
-            const valueId = `${l_prefix.toLowerCase()}${i}-${label.toLowerCase()[0]}`;
+            const valueId = `${l_prefix.toLowerCase()}${i}-${label.toLowerCase()[0]}`; // e.g. pv1-v, pv1-a
+            
             const color = colorMap[l_prefix][i-1] || COLORS.pv1;
-            
-            let phaseLabel = `${l_prefix}${i}`;
-            let chartLabel = `${phaseLabel} ${label}`;
-            
-            // Special case for L3 which maps to Line-Line voltages on Growatt Modbus
-            if (l_prefix === 'L' && i === 3) {
-                if (unit === 'V') {
-                    phaseLabel = 'L1-L2';
-                    chartLabel = 'L1-L2 Voltage';
-                } else if (unit === 'A') {
-                    phaseLabel = 'L2-L3';
-                    chartLabel = 'L2-L3 Voltage'; // It's actually a voltage reading, not current!
-                    unit = 'V'; // Override the unit to V since it reads voltage
-                }
-            }
-            
             html += `
             <article class="card card--phase card--with-chart">
               <div class="phase-row">
-                <div class="phase-badge" style="background: ${color}; color: #fff; font-size: ${phaseLabel.length > 2 ? '10px' : '11px'};">${phaseLabel}</div>
+                <div class="phase-badge" style="background: ${color}; color: #fff;">${l_prefix}${i}</div>
                 <div class="phase-value-group">
                   <div class="card-value" id="${valueId}" style="color: ${color}">—</div>
                   <div class="card-unit">${unit}</div>
                 </div>
               </div>
               <div class="chart-wrapper chart-wrapper--inline">
-                <canvas id="${chartId}" aria-label="${chartLabel} history"></canvas>
+                <canvas id="${chartId}" aria-label="${l_prefix}${i} ${label} history"></canvas>
               </div>
             </article>`;
         }
         el.innerHTML = html;
         
+        // Initialize sparkline charts
         for(let i=1; i<=count; i++) {
             const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
             const color = colorMap[l_prefix][i-1] || COLORS.pv1;
-            
-            let phaseLabel = `${l_prefix}${i}`;
-            let chartLabel = `${phaseLabel} ${label}`;
-            if (l_prefix === 'L' && i === 3) {
-                if (unit === 'V' || label === 'Voltage') chartLabel = 'L1-L2 Voltage';
-                else if (label === 'Current') chartLabel = 'L2-L3 Voltage';
-            }
-            
-            charts[chartId] = createChart(chartId, [{ label: chartLabel, color: color }], false);
+            charts[chartId] = createChart(chartId, [{ label: `${l_prefix}${i} ${label}`, color: color }], false);
         }
     };
 
     createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
-    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
-    createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
+    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
+    createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
 
     charts.overview = createChart('chart-power', [
-        { label: 'PV', color: COLORS.pv1 },
-        { label: 'Grid Net', color: COLORS.net },
-        { label: 'EPS', color: COLORS.load }
+        { label: 'PV (W)', color: COLORS.pv1 },
+        { label: 'Grid Net (W)', color: COLORS.net },
+        { label: 'Load (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
         { label: 'Total', color: COLORS.delivered, borderWidth: 2 },
@@ -355,7 +333,7 @@ async function loadHistory(hours = 24) {
         
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
-        for(let i=1; i<=3; i++) { ds[`chart-v-l${i}`] = [[]]; ds[`chart-c-l${i}`] = [[]]; }
+        for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-c-grid${i}`] = [[]]; }
 
         let firstTs = null;
         let lastTs = null;
@@ -370,7 +348,7 @@ async function loadHistory(hours = 24) {
             }
             lastStatus = statusStr;
 
-            ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.eps_p_mean));
+            ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.load_p_mean));
             ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
             ds.battery[0].push(Math.round(d.bat_p_mean));
@@ -467,8 +445,8 @@ function connectSSE() {
             updateDOM("sum-bat-autonomy", "—");
         }
         
-        updateDOM("sum-load", d.eps_p.toFixed(0));
-        updateDOM("sum-load-today", "—"); // No daily EPS stat in API yet
+        updateDOM("sum-load", d.load_p.toFixed(0));
+        updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
         
         // Explicitly ignoring L1/L2/L3 house load splits since we cannot derive them purely from the Modbus data without assumptions
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
@@ -605,16 +583,16 @@ function connectSSE() {
 
         for(let i=1; i<=4; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
-            updateDOM(`pv${i}-c`, d[`pv${i}_a`].toFixed(1));
-            // Power isn't bound to the cards directly
+            updateDOM(`pv${i}-a`, d[`pv${i}_a`].toFixed(1));
+            updateDOM(`pv${i}-w`, d[`pv${i}_w`].toFixed(0));
         }
 
         const g1w = d.grid_l1_v * d.grid_l1_a;
         const g2w = d.grid_l2_v * d.grid_l2_a;
         const g3w = d.grid_l3_v * d.grid_l3_a;
         for(let i=1; i<=3; i++) {
-            updateDOM(`l${i}-v`, d[`grid_l${i}_v`].toFixed(1));
-            updateDOM(`l${i}-c`, d[`grid_l${i}_a`].toFixed(1));
+            updateDOM(`grid${i}-v`, d[`grid_l${i}_v`].toFixed(1));
+            updateDOM(`grid${i}-a`, d[`grid_l${i}_a`].toFixed(1));
         }
         updateDOM(`grid1-w`, g1w.toFixed(0));
         updateDOM(`grid2-w`, g2w.toFixed(0));
@@ -625,7 +603,7 @@ function connectSSE() {
         updateDOM("bat-w", d.bat_p.toFixed(0));
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
-        pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.eps_p)]);
+        pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.load_p)]);
         pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w), Math.round(d.pv4_w)]);
         pushChart(charts.grid, ts, [Math.round(-d.meter_total_w), Math.round(g1w), Math.round(g2w), Math.round(g3w)]);
         pushChart(charts.battery, ts, [Math.round(d.bat_p)]);

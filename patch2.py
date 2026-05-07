@@ -1,48 +1,87 @@
-with open("dashboard/static/js/dashboard.js", "r") as f: js = f.read()
+import re
 
-js = js.replace('''            for(let i=1; i<=3; i++) {
-                let v = d[`grid_l${i}_v_mean`], c = d[`grid_l${i}_a_mean`];
-                ds[`chart-v-grid${i}`][0].push(v);
-                ds[`chart-c-grid${i}`][0].push(c);
-                extremes.grid_v.min = Math.min(extremes.grid_v.min, v); extremes.grid_v.max = Math.max(extremes.grid_v.max, v);
-                extremes.grid_c.min = Math.min(extremes.grid_c.min, c); extremes.grid_c.max = Math.max(extremes.grid_c.max, c);
-            }''', '''            for(let i=1; i<=3; i++) {
-                let v = d[`grid_l${i}_v_mean`], c = d[`grid_l${i}_a_mean`];
-                ds[`chart-v-l${i}`][0].push(v);
-                ds[`chart-c-l${i}`][0].push(c);
-                extremes.grid_v.min = Math.min(extremes.grid_v.min, v); extremes.grid_v.max = Math.max(extremes.grid_v.max, v);
-                extremes.grid_c.min = Math.min(extremes.grid_c.min, c); extremes.grid_c.max = Math.max(extremes.grid_c.max, c);
-            }''')
+# 1. FIX HTML SUMMARY STRIP
+with open('dashboard/static/dashboard.html', 'r') as f:
+    html = f.read()
 
-js = js.replace('''        for(let i=1; i<=3; i++) {
-            charts[`chart-v-grid${i}`].data.labels = labels; charts[`chart-v-grid${i}`].data.datasets[0].data = ds[`chart-v-grid${i}`][0]; charts[`chart-v-grid${i}`].update('none');
-            charts[`chart-c-grid${i}`].data.labels = labels; charts[`chart-c-grid${i}`].data.datasets[0].data = ds[`chart-c-grid${i}`][0]; charts[`chart-c-grid${i}`].update('none');
-        }''', '''        for(let i=1; i<=3; i++) {
-            charts[`chart-v-l${i}`].data.labels = labels; charts[`chart-v-l${i}`].data.datasets[0].data = ds[`chart-v-l${i}`][0]; charts[`chart-v-l${i}`].update('none');
-            charts[`chart-c-l${i}`].data.labels = labels; charts[`chart-c-l${i}`].data.datasets[0].data = ds[`chart-c-l${i}`][0]; charts[`chart-c-l${i}`].update('none');
-        }''')
+summary_html = """    <section class="summary-strip">
+      <!-- 1 -->
+      <div class="summary-item">
+        <div class="summary-item-header">Current Production</div>
+        <table class="summary-table">
+          <tbody>
+            <tr><td class="st-energy"><span id="sum-pv">—</span> W</td></tr>
+            <tr><td class="st-label" id="sum-pv-hint" style="color:var(--text-muted);font-size:0.8rem">WAITING</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- 2 -->
+      <div class="summary-item">
+        <div class="summary-item-header">Grid Power</div>
+        <table class="summary-table">
+          <tbody>
+            <tr><td class="st-energy"><span id="sum-grid">—</span> W</td></tr>
+            <tr><td class="st-label" id="sum-grid-hint" style="color:var(--text-muted);font-size:0.8rem">Importing</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- 3 -->
+      <div class="summary-item">
+        <div class="summary-item-header">Battery SOC</div>
+        <table class="summary-table">
+          <tbody>
+            <tr><td class="st-energy"><span id="sum-bat">—</span> %</td></tr>
+            <tr><td class="st-label" id="sum-bat-hint" style="color:var(--text-muted);font-size:0.8rem">Idle</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- 4 -->
+      <div class="summary-item">
+        <div class="summary-item-header">House Consumption</div>
+        <table class="summary-table">
+          <tbody>
+            <tr><td class="st-energy" style="color:#a855f7"><span id="sum-load">—</span> W</td></tr>
+            <tr><td class="st-label" style="color:var(--text-muted);font-size:0.8rem">Live Load</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>"""
 
-js = js.replace('''        const pvCCharts = []; for(let i=1; i<=4; i++) pvCCharts.push(charts[`chart-c-pv${i}`]);
-        const gridVCharts = []; for(let i=1; i<=3; i++) gridVCharts.push(charts[`chart-v-grid${i}`]);
-        const gridCCharts = []; for(let i=1; i<=3; i++) gridCCharts.push(charts[`chart-c-grid${i}`]);''', '''        const pvCCharts = []; for(let i=1; i<=4; i++) pvCCharts.push(charts[`chart-c-pv${i}`]);
-        const gridVCharts = []; for(let i=1; i<=3; i++) gridVCharts.push(charts[`chart-v-l${i}`]);
-        const gridCCharts = []; for(let i=1; i<=3; i++) gridCCharts.push(charts[`chart-c-l${i}`]);''')
+html = re.sub(r'<section class="summary-strip">.*?</section>', summary_html, html, flags=re.DOTALL)
+html = html.replace('?v=5', '?v=6')
+with open('dashboard/static/dashboard.html', 'w') as f:
+    f.write(html)
 
+# 2. FIX JS THEME TOGGLE
+with open('dashboard/static/js/dashboard.js', 'r') as f:
+    js = f.read()
 
-js = js.replace('''        for(let i=1; i<=4; i++) {
-            pushChart(charts[`chart-v-pv${i}`], ts, [d[`pv${i}_v`]]);
-            pushChart(charts[`chart-c-pv${i}`], ts, [d[`pv${i}_a`]]);
-        }
-        for(let i=1; i<=3; i++) {
-            pushChart(charts[`chart-v-grid${i}`], ts, [d[`grid_l${i}_v`]]);
-            pushChart(charts[`chart-c-grid${i}`], ts, [d[`grid_l${i}_a`]]);
-        }''', '''        for(let i=1; i<=4; i++) {
-            pushChart(charts[`chart-v-pv${i}`], ts, [d[`pv${i}_v`]]);
-            pushChart(charts[`chart-c-pv${i}`], ts, [d[`pv${i}_a`]]);
-        }
-        for(let i=1; i<=3; i++) {
-            pushChart(charts[`chart-v-l${i}`], ts, [d[`grid_l${i}_v`]]);
-            pushChart(charts[`chart-c-l${i}`], ts, [d[`grid_l${i}_a`]]);
-        }''')
+theme_logic = """
+const THEME_CYCLE  = ["light", "dark", "auto"];
+const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
 
-with open("dashboard/static/js/dashboard.js", "w") as f: f.write(js)
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("hegg-theme", theme);
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = THEME_LABELS[theme] ?? theme;
+}
+
+function cycleTheme() {
+  const current = document.documentElement.dataset.theme || "light";
+  const next    = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
+  applyTheme(next);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const toggleBtn = document.getElementById("theme-toggle");
+    if (toggleBtn) {
+        toggleBtn.addEventListener("click", cycleTheme);
+        const savedTheme = document.documentElement.dataset.theme || "light";
+        toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
+    }
+"""
+
+js = js.replace('document.addEventListener("DOMContentLoaded", () => {', theme_logic)
+with open('dashboard/static/js/dashboard.js', 'w') as f:
+    f.write(js)
