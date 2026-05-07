@@ -31,8 +31,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
     client.connect()
     
     # Read static configuration once at startup
-    bat_nominal_kwh = 0.0
-    while bat_nominal_kwh == 0.0:
+    bat_nominal_kwh = None
+    while bat_nominal_kwh is None:
         try:
             r_config = client.read_holding_registers(1005, count=1, device_id=1)
             if not r_config.isError():
