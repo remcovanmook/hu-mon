@@ -273,6 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
         { label: 'L3', color: COLORS.l3 }
     ]);
     charts.eps.options.scales.y.stacked = true;
+    charts.eps.options.scales.y.min = 0;
     charts.eps.data.datasets[0].stack = 'net';
     charts.eps.data.datasets[0].borderWidth = 3;
     for(let i=1; i<=3; i++) {
@@ -672,7 +673,7 @@ function connectSSE() {
         const e3w = (d.eps_l3_v || 0) * (d.eps_l3_a || 0);
         for(let i=1; i<=3; i++) {
             updateDOM(`eps${i}-v`, (d[`eps_l${i}_v`] || 0).toFixed(1));
-            updateDOM(`eps${i}-a`, (d[`eps_l${i}_a`] || 0).toFixed(1));
+            updateDOM(`eps${i}-c`, (d[`eps_l${i}_a`] || 0).toFixed(1));
         }
         updateDOM("sum-eps-val", Math.abs(d.eps_p).toFixed(0));
         pushChart(charts.eps, ts, [Math.round(d.eps_p), Math.round(e1w), Math.round(e2w), Math.round(e3w)]);
