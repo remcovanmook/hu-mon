@@ -232,10 +232,12 @@ document.addEventListener("DOMContentLoaded", () => {
         { label: 'Load (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
+        { label: 'Total PV (W)', color: COLORS.delivered, borderWidth: 2 },
         { label: 'S1 (W)', color: COLORS.pv1 }, { label: 'S2 (W)', color: COLORS.pv2 },
         { label: 'S3 (W)', color: COLORS.pv3 }, { label: 'S4 (W)', color: COLORS.pv4 }
     ]);
     charts.grid = createChart('chart-grid', [
+        { label: 'Net Grid (W)', color: COLORS.net, borderWidth: 2 },
         { label: 'L1 (W)', color: COLORS.l1 }, { label: 'L2 (W)', color: COLORS.l2 }, { label: 'L3 (W)', color: COLORS.l3 }
     ]);
     charts.battery = createChart('chart-battery', [
@@ -299,7 +301,7 @@ function createChart(id, series, showLegend = true) {
             x: { 
                 type: "time", 
                 time: { tooltipFormat: "HH:mm" }, 
-                grid: { display: false },
+                grid: { display: true, color: "rgba(100, 100, 100, 0.1)" },
                 ticks: { maxTicksLimit: 6, display: showLegend },
                 border: { display: showLegend }
             },
@@ -325,7 +327,7 @@ async function loadHistory(hours = 24) {
         if(data.length === 0) return;
         
         const labels = [];
-        const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[]], battery: [[]] };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], battery: [[]] };
         
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
@@ -345,8 +347,8 @@ async function loadHistory(hours = 24) {
             lastStatus = statusStr;
 
             ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
-            ds.pv[0].push(d.pv1_w_mean); ds.pv[1].push(d.pv2_w_mean); ds.pv[2].push(d.pv3_w_mean); ds.pv[3].push(d.pv4_w_mean);
-            ds.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
+            ds.pv[0].push(d.pv_total_w_mean); ds.pv[1].push(d.pv1_w_mean); ds.pv[2].push(d.pv2_w_mean); ds.pv[3].push(d.pv3_w_mean); ds.pv[4].push(d.pv4_w_mean);
+            ds.grid[0].push(d.meter_total_w_mean); ds.grid[1].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[2].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[3].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
             ds.battery[0].push(d.bat_p_mean);
             
             for(let i=1; i<=4; i++) {
@@ -417,11 +419,13 @@ function connectSSE() {
         
         
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
+        updateDOM("sum-pv-val", d.pv_total_w.toFixed(0)); // Header of PV tab
         updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
         updateDOM("sum-pv-today", d.pv_today_kwh.toFixed(1));
         updateDOM("sum-pv-total", d.pv_total_kwh.toFixed(0));
 
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
+        updateDOM("sum-grid-val", Math.abs(d.meter_total_w).toFixed(0)); // Header of Grid tab
         updateDOM("sum-grid-stat", d.meter_total_w >= 0 ? "Exporting" : "Importing");
         updateDOM("sum-grid-today", d.meter_total_w >= 0 ? d.grid_export_today_kwh.toFixed(1) : d.grid_import_today_kwh.toFixed(1));
         // Hardcode "total ever" until we add it, or just show Export for now
@@ -598,8 +602,8 @@ function connectSSE() {
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
         pushChart(charts.overview, ts, [d.pv_total_w, d.meter_total_w, d.load_p]);
-        pushChart(charts.pv, ts, [d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
-        pushChart(charts.grid, ts, [g1w, g2w, g3w]);
+        pushChart(charts.pv, ts, [d.pv_total_w, d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
+        pushChart(charts.grid, ts, [d.meter_total_w, g1w, g2w, g3w]);
         pushChart(charts.battery, ts, [d.bat_p]);
     });
 }
