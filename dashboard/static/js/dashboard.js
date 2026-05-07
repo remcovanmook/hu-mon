@@ -401,11 +401,7 @@ async function loadHistory(hours = 24) {
                 if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
                 if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
                 if(c > extremes.grid_c[i-1].max) extremes.grid_c[i-1].max = c;
-            let ev = d[`eps_l${i}_v`] || 0, ec = d[`eps_l${i}_a`] || 0;
-            if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
-            if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
-            if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
-            if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
+
                 let ev = d[`eps_l${i}_v_mean`], ec = d[`eps_l${i}_a_mean`];
                 if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
                 if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
@@ -563,11 +559,7 @@ function connectSSE() {
             if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
             if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
             if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
-                let ev = d[`eps_l${i}_v_mean`], ec = d[`eps_l${i}_a_mean`];
-                if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
-                if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
-                if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
-                if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
+
         }
         
         // Live Sync

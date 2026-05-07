@@ -78,8 +78,6 @@ These registers are Read-Only and provide real-time telemetry.
 | 04 (Input) | 3138-39 | EPS L2 P | U32 | W | 0.1 | Phase 2 Backup Watts |
 | 04 (Input) | 3140-41 | EPS L3 P | U32 | W | 0.1 | Phase 3 Backup Watts |
 | 04 (Input) | 3131/33/35 | EPS I L1/2/3 | U16×3 | A | 0.1 | Current per Phase on EPS |
-| **HOUSE LOAD** | | | | | | |
-| 04 (Input) | N/A | House Total P | N/A | W | N/A | Derived mathematically (PV - Meter - Bat) |
 | **BATTERY APX (HOLDING REGISTERS)** | | | | | | |
 | 03 (Hold) | 1001 | Battery Type | U16 | — | 1 | 1: Lithium (APX) |
 | 03 (Hold) | 1002 | Design Capacity | U16 | Ah | 1 | Nominal capacity in Amp-hours |
