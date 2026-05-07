@@ -162,6 +162,26 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
     }
     
+    document.getElementById("history-range").addEventListener("change", (e) => {
+        const hours = parseInt(e.target.value, 10);
+        // Clear all charts
+        Object.values(charts).forEach(c => {
+            if (c) {
+                c.data.labels = [];
+                c.data.datasets.forEach(ds => ds.data = []);
+                c.update('none');
+            }
+        });
+        // Clear extremes
+        for(let i=0; i<4; i++) { extremes.pv_v[i] = {min: Infinity, max: -Infinity}; extremes.pv_c[i] = {min: Infinity, max: -Infinity}; }
+        for(let i=0; i<3; i++) { extremes.grid_v[i] = {min: Infinity, max: -Infinity}; extremes.grid_c[i] = {min: Infinity, max: -Infinity}; }
+        statusAnnotations = {};
+        lastStatus = null;
+        
+        currentHours = hours;
+        loadHistory(hours);
+    });
+    
     // Auto-create DOM cards for phase arrays matching HEGG template
     const createGroup = (id, label, unit, count, l_prefix) => {
         const el = document.getElementById(id);
@@ -229,10 +249,12 @@ document.addEventListener("DOMContentLoaded", () => {
     tickClock();
     setInterval(tickClock, 1000);
 
-    loadHistory();
+    loadHistory(currentHours);
     connectSSE();
     recolorCharts();
 });
+
+let currentHours = 24;
 
 function createChart(id, series, showLegend = true) {
     const el = document.getElementById(id);
@@ -295,9 +317,9 @@ function updateDOM(id, val) {
     if(el && el.innerText !== String(val)) el.innerText = val;
 }
 
-async function loadHistory() {
+async function loadHistory(hours = 24) {
     try {
-        const res = await fetch(`/api/history?hours=24`);
+        const res = await fetch(`/api/history?hours=${hours}`);
         if(!res.ok) return;
         const data = await res.json();
         if(data.length === 0) return;
@@ -345,7 +367,7 @@ async function loadHistory() {
             }
         });
         
-        const flooredMin = Date.now() - 24 * 3600000;
+        const flooredMin = Date.now() - hours * 3600000;
 
         // Apply global sync and datasets
         Object.keys(charts).forEach(k => {
@@ -434,12 +456,20 @@ function connectSSE() {
         updateDOM("meta-e-today", d.pv_today_kwh.toFixed(1) + " kWh");
         updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
 
+        const flooredMin = Date.now() - currentHours * 3600000;
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
         if (statusStr !== lastStatus && lastStatus !== null) {
             statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
             Object.values(charts).forEach(chart => {
                 if(chart) {
+                    chart.options.scales.x.min = flooredMin;
                     chart.options.plugins.annotation.annotations = Object.assign({}, chart.options.plugins.annotation.annotations, statusAnnotations);
+                }
+            });
+        } else {
+            Object.values(charts).forEach(chart => {
+                if(chart) {
+                    chart.options.scales.x.min = flooredMin;
                 }
             });
         }
