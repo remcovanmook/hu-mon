@@ -69,7 +69,7 @@ function getBaseOpts() {
 
 function switchTab(id) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-btn--active'));
-    document.querySelectorAll('.tab-panel').forEach(c => c.hidden = true);
+    document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
     document.getElementById(`tab-btn-${id}`).classList.add('tab-btn--active');
     document.getElementById(`tab-${id}`).hidden = false;
 }
