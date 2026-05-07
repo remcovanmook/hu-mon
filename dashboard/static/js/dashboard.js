@@ -54,7 +54,7 @@ function updateSparklineAnnotations(chart, min, max, color) {
   if(!chart) return;
   const cStr = typeof color === 'string' && color.startsWith('#') ? color + '80' : color;
   const bg = typeof color === 'string' && color.startsWith('#') ? color + 'd0' : 'rgba(100,100,100,0.8)';
-  chart.options.plugins.annotation.annotations = Object.assign({}, chart.options.plugins.annotation.annotations, {
+  chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations,
     minLine: {
       type: 'line', yMin: min, yMax: min, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
       label: { display: true, content: min.toFixed(1), position: 'end', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
@@ -132,13 +132,13 @@ function getBaseOpts() {
         responsive: true, maintainAspectRatio: false, animation: false,
         transitions: { active: { animation: { duration: 0 } } },
         interaction: { mode: "index", intersect: false },
-        plugins: { annotation: { annotations: {} } },
         elements: { point: { radius: 0, hitRadius: 6 }, line: { tension: 0.3, borderWidth: 1.5 } },
         scales: {
             x: { type: "time", time: { tooltipFormat: "HH:mm:ss" }, ticks: { maxTicksLimit: 8 } },
             y: {}
         },
         plugins: {
+            annotation: { annotations: {} },
             legend: { display: true },
             tooltip: { padding: 10 }
         }
@@ -171,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {
-        const hours = parseInt(e.target.value, 10);
+        const hours = Number.parseInt(e.target.value, 10);
         // Clear all charts
         Object.values(charts).forEach(c => {
             if (c) {
@@ -315,7 +315,6 @@ function createChart(id, series, showLegend = true) {
     const opts = {
         responsive: true, maintainAspectRatio: false, animation: false,
         interaction: { mode: "index", intersect: false },
-        plugins: { annotation: { annotations: {} } },
         plugins: {
             annotation: { annotations: {} },
             legend: { 
@@ -369,7 +368,7 @@ async function loadHistory(hours = 24) {
         for(let i=1; i<=3; i++) { ds[`chart-v-l${i}`] = [[]]; ds[`chart-c-l${i}`] = [[]]; }
 
         let firstTs = null;
-        let lastTs = null;
+
         data.forEach(d => {
             labels.push(d.ts);
             if (!firstTs) firstTs = d.ts;
@@ -416,7 +415,7 @@ async function loadHistory(hours = 24) {
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
-            charts[k].options.plugins.annotation.annotations = Object.assign({}, statusAnnotations);
+            charts[k].options.plugins.annotation.annotations = { ...statusAnnotations };
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
         });
@@ -435,10 +434,7 @@ async function loadHistory(hours = 24) {
         const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
         syncChartScales(epsVCharts, extremes.eps_v, 0);
         syncChartScales(epsCCharts, extremes.eps_c, 0);
-        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
-        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
-        syncChartScales(epsVCharts, extremes.eps_v, 0);
-        syncChartScales(epsCCharts, extremes.eps_c, 0);
+
 
         for(let i=1; i<=4; i++) {
             updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
@@ -452,7 +448,9 @@ async function loadHistory(hours = 24) {
         }
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
-    } catch(e) {}
+    } catch(e) {
+        console.error("Error fetching historical data:", e);
+    }
 }
 
 function pushChart(chart, ts, values) {
@@ -485,7 +483,7 @@ function connectSSE() {
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
         
         if (d.bat_nominal_kwh > 0) {
-            const bat_kwh = (d.bat_soc / 100.0) * d.bat_nominal_kwh;
+            const bat_kwh = (d.bat_soc / 100) * d.bat_nominal_kwh;
             updateDOM("sum-bat-kwh", bat_kwh.toFixed(1));
             const autonomy = d.load_p > 0 ? (bat_kwh * 1000 / d.load_p).toFixed(1) : "—";
             updateDOM("sum-bat-autonomy", autonomy);
@@ -518,7 +516,7 @@ function connectSSE() {
             Object.values(charts).forEach(chart => {
                 if(chart) {
                     chart.options.scales.x.min = flooredMin;
-                    chart.options.plugins.annotation.annotations = Object.assign({}, chart.options.plugins.annotation.annotations, statusAnnotations);
+                    chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations, ...statusAnnotations };
                 }
             });
         } else {
@@ -575,10 +573,7 @@ function connectSSE() {
         const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
         syncChartScales(epsVCharts, extremes.eps_v, 0);
         syncChartScales(epsCCharts, extremes.eps_c, 0);
-        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
-        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
-        syncChartScales(epsVCharts, extremes.eps_v, 0);
-        syncChartScales(epsCCharts, extremes.eps_c, 0);
+
         
         for(let i=1; i<=4; i++) {
             updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
