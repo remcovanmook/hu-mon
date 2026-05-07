@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Growatt Power Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <header class="glass-header">
+        <div class="logo">GROWATT <span class="badge">PROXY</span></div>
+        <div class="status-bar">
+            <div class="status-item"><span class="label">Status</span> <span id="v-status" class="value ok">WAITING</span></div>
+            <div class="status-item"><span class="label">Net Power</span> <span id="v-net" class="value">0 W</span></div>
+        </div>
+    </header>
+
+    <main class="dashboard-grid">
+        <!-- Live Power Flow Overview -->
+        <section class="card power-flow">
+            <h2>Power Routing</h2>
+            <div class="flow-container">
+                <div class="node pv">
+                    <span class="icon">☀️</span>
+                    <span class="label">PV Generation</span>
+                    <span id="f-pv" class="val">0 W</span>
+                </div>
+                <div class="node inverter">
+                    <span class="icon">⚡</span>
+                    <span class="label">Inverter</span>
+                </div>
+                <div class="node grid">
+                    <span class="icon">🏢</span>
+                    <span class="label">Grid</span>
+                    <span id="f-grid" class="val">0 W</span>
+                </div>
+                <div class="node battery">
+                    <span class="icon">🔋</span>
+                    <span class="label">Battery <span id="f-soc">0%</span></span>
+                    <span id="f-bat" class="val">0 W</span>
+                </div>
+                <div class="node load">
+                    <span class="icon">🏠</span>
+                    <span class="label">House Load</span>
+                    <span id="f-load" class="val">0 W</span>
+                </div>
+                <!-- Animated Paths -->
+                <svg class="flow-lines">
+                    <path d="M 120 80 L 300 80" class="line pv-inv" />
+                    <path d="M 400 80 L 580 80" class="line inv-grid" />
+                    <path d="M 350 120 L 350 200 L 120 200" class="line inv-bat" />
+                    <path d="M 350 120 L 350 200 L 580 200" class="line inv-load" />
+                </svg>
+            </div>
+        </section>
+
+        <!-- PV Array Diagnostics -->
+        <section class="card pv-diagnostics">
+            <h2>PV Array Diagnostics</h2>
+            <div class="pv-grid">
+                <div class="pv-card" id="pv1">
+                    <h3>String 1</h3>
+                    <div class="pv-metrics">
+                        <div><span class="m-val" id="pv1-v">0</span> V</div>
+                        <div><span class="m-val" id="pv1-a">0</span> A</div>
+                    </div>
+                    <div class="pv-power"><span id="pv1-w">0</span> W</div>
+                    <div class="progress-bar"><div class="fill" id="pv1-fill"></div></div>
+                </div>
+                <div class="pv-card" id="pv2">
+                    <h3>String 2</h3>
+                    <div class="pv-metrics">
+                        <div><span class="m-val" id="pv2-v">0</span> V</div>
+                        <div><span class="m-val" id="pv2-a">0</span> A</div>
+                    </div>
+                    <div class="pv-power"><span id="pv2-w">0</span> W</div>
+                    <div class="progress-bar"><div class="fill" id="pv2-fill"></div></div>
+                </div>
+                <div class="pv-card" id="pv3">
+                    <h3>String 3</h3>
+                    <div class="pv-metrics">
+                        <div><span class="m-val" id="pv3-v">0</span> V</div>
+                        <div><span class="m-val" id="pv3-a">0</span> A</div>
+                    </div>
+                    <div class="pv-power"><span id="pv3-w">0</span> W</div>
+                    <div class="progress-bar"><div class="fill" id="pv3-fill"></div></div>
+                </div>
+                <div class="pv-card" id="pv4">
+                    <h3>String 4</h3>
+                    <div class="pv-metrics">
+                        <div><span class="m-val" id="pv4-v">0</span> V</div>
+                        <div><span class="m-val" id="pv4-a">0</span> A</div>
+                    </div>
+                    <div class="pv-power"><span id="pv4-w">0</span> W</div>
+                    <div class="progress-bar"><div class="fill" id="pv4-fill"></div></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const es = new EventSource("/stream");
+        
+        function updateDOM(id, val) {
+            const el = document.getElementById(id);
+            if(el) el.innerText = val;
+        }
+
+        es.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            // Status
+            const statuses = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
+            const statText = statuses[data.status_code] || "UNKNOWN";
+            const statEl = document.getElementById("v-status");
+            statEl.innerText = statText;
+            statEl.className = "value " + (data.status_code === 1 ? "ok" : "warn");
+
+            // Flow
+            updateDOM("f-pv", `${data.pv_total_w.toFixed(0)} W`);
+            updateDOM("f-grid", `${Math.abs(data.meter_total_w).toFixed(0)} W ${data.meter_total_w > 0 ? '(Export)' : '(Import)'}`);
+            updateDOM("f-bat", `${Math.abs(data.bat_p).toFixed(0)} W ${data.bat_p > 0 ? '(Charge)' : '(Discharge)'}`);
+            updateDOM("f-soc", `${data.bat_soc}%`);
+            updateDOM("f-load", `${data.load_p.toFixed(0)} W`);
+            updateDOM("v-net", `${data.meter_total_w.toFixed(0)} W`);
+
+            // PV Strings
+            for(let i=1; i<=4; i++) {
+                updateDOM(`pv${i}-v`, data[`pv${i}_v`].toFixed(1));
+                updateDOM(`pv${i}-a`, data[`pv${i}_a`].toFixed(1));
+                const p = data[`pv${i}_w`];
+                updateDOM(`pv${i}-w`, p.toFixed(0));
+                
+                // Max MPPT string power assumed ~4000W for fill
+                const pct = Math.min(100, Math.max(0, (p / 4000) * 100));
+                document.getElementById(`pv${i}-fill`).style.width = `${pct}%`;
+            }
+        };
+    </script>
+</body>
+</html>
