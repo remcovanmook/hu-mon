@@ -134,24 +134,60 @@ function createChart(id, series) {
     const el = document.getElementById(id);
     if(!el) return null;
     const ctx = el.getContext('2d');
-    const opts = getBaseOpts();
-    return new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: series.map(s => ({
-                label: s.label, 
-                borderColor: s.color, 
-                backgroundColor: s.color + '33', // 20% opacity fill
-                data: [], 
-                fill: true, 
-                tension: 0.4, 
-                pointRadius: 0,
-                borderWidth: 2
-            }))
-        },
-        options: opts
+    
+    const datasets = series.map(s => {
+        let bg = s.color + '22';
+        if (s.fill !== false) {
+            bg = ctx.createLinearGradient(0, 0, 0, 300);
+            bg.addColorStop(0, s.color + '66');
+            bg.addColorStop(1, s.color + '05');
+        }
+        return {
+            label: s.label, 
+            borderColor: s.color, 
+            backgroundColor: bg,
+            data: [], 
+            fill: 'origin', 
+            tension: 0.4, 
+            pointRadius: 0,
+            borderWidth: 2,
+            borderCapStyle: 'round'
+        };
     });
+
+    const opts = {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+            legend: { 
+                display: true, 
+                position: 'bottom',
+                labels: { usePointStyle: true, boxWidth: 8, padding: 20 }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                titleFont: { size: 13, family: 'JetBrains Mono' },
+                bodyFont: { size: 13, family: 'JetBrains Mono' },
+                padding: 12,
+                cornerRadius: 8,
+                displayColors: true
+            }
+        },
+        scales: {
+            x: { 
+                type: "time", 
+                time: { tooltipFormat: "HH:mm" }, 
+                grid: { display: false },
+                ticks: { maxTicksLimit: 6 }
+            },
+            y: { 
+                grid: { color: "rgba(100, 100, 100, 0.1)", borderDash: [5, 5] },
+                beginAtZero: true
+            }
+        }
+    };
+
+    return new Chart(ctx, { type: 'line', data: { labels: [], datasets: datasets }, options: opts });
 }
 
 function updateDOM(id, val) {
