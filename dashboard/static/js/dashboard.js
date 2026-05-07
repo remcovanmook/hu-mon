@@ -2,105 +2,120 @@
 "use strict";
 
 const charts = {};
+const maxPoints = 60;
 const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
 
-// Use exact Hegg colors
-const COLORS = {
-  pv: '#22c55e',
-  grid: '#f59e0b',
-  load: '#a855f7',
-  l1: '#ef4444',
-  l2: '#eab308',
-  l3: '#3b82f6',
-  pv1: '#3b82f6',
-  pv2: '#8b5cf6',
-  pv3: '#ec4899',
-  pv4: '#14b8a6'
-};
+function chartPalette() {
+  const s = getComputedStyle(document.documentElement);
+  const v = name => s.getPropertyValue(name).trim();
+  return {
+    delivered: v("--delivered-color") || '#22c55e',
+    returned:  v("--returned-color") || '#f59e0b',
+    net:       v("--net-color") || '#3b82f6',
+    l1:        v("--phase-l1") || '#ef4444',
+    l2:        v("--phase-l2") || '#eab308',
+    l3:        v("--phase-l3") || '#3b82f6',
+    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', pv4: '#14b8a6', load: '#a855f7'
+  };
+}
+let COLORS = chartPalette();
 
-const BASE_OPTS = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    transitions: { active: { animation: { duration: 0 } } },
-    interaction: { mode: "index", intersect: false },
-    elements: {
-        point: { radius: 0, hitRadius: 6 },
-        line:  { tension: 0.3, borderWidth: 1.5 },
-    },
-    scales: {
-        x: {
-            type: "time",
-            time: {
-                tooltipFormat: "HH:mm:ss",
-                displayFormats: { second: "HH:mm:ss", minute: "HH:mm", hour: "HH:mm", day: "MMM d" },
-            },
-            ticks: { color: "#6b7490", maxTicksLimit: 8, font: { size: 11 } },
-            grid:  { color: "rgba(255,255,255,0.04)" },
-            border: { display: false },
+const THEME_CYCLE  = ["light", "dark", "auto"];
+const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("hegg-theme", theme);
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = THEME_LABELS[theme] ?? theme;
+  recolorCharts();
+}
+function cycleTheme() {
+  const current = document.documentElement.dataset.theme || "light";
+  const next    = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
+  applyTheme(next);
+}
+function recolorCharts() {
+  COLORS = chartPalette();
+  const s = getComputedStyle(document.documentElement);
+  const grid = s.getPropertyValue("--chart-grid").trim() || "rgba(0,0,0,0.06)";
+  const tick = s.getPropertyValue("--text-muted").trim() || "#6b7490";
+  Chart.defaults.color = tick;
+  Object.values(charts).forEach(chart => {
+      Object.values(chart.options.scales).forEach(axis => {
+          if (axis.ticks) axis.ticks.color = tick;
+          if (axis.grid) axis.grid.color = grid;
+      });
+      chart.update("none");
+  });
+}
+
+function getBaseOpts() {
+    return {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        transitions: { active: { animation: { duration: 0 } } },
+        interaction: { mode: "index", intersect: false },
+        elements: { point: { radius: 0, hitRadius: 6 }, line: { tension: 0.3, borderWidth: 1.5 } },
+        scales: {
+            x: { type: "time", time: { tooltipFormat: "HH:mm:ss" }, ticks: { maxTicksLimit: 8 } },
+            y: {}
         },
-        y: {
-            ticks: { color: "#6b7490", font: { size: 11 } },
-            grid:  { color: "rgba(255,255,255,0.04)" },
-            border: { display: false },
-        },
-    },
-    plugins: {
-        legend: { display: true, labels: { color: "#9ca3af" } },
-        tooltip: {
-            backgroundColor: "rgba(22,26,34,0.95)",
-            borderColor: "rgba(255,255,255,0.1)",
-            borderWidth: 1,
-            titleColor: "#e8eaf0",
-            bodyColor: "#9ca3af",
-            padding: 10,
-        }
-    }
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.target).classList.add('active');
-        });
-    });
-
-    const createGroup = (id, label, unit, count, l_prefix) => {
-        const el = document.getElementById(id);
-        for(let i=1; i<=count; i++) {
-            el.innerHTML += `<article class="card"><div class="card-label">${l_prefix} ${i} ${label}</div><div class="phase-value-group"><div class="card-value" id="${l_prefix.toLowerCase()}${i}-${unit.toLowerCase()}">—</div><div class="card-unit">${unit}</div></div></article>`;
+        plugins: {
+            legend: { display: true },
+            tooltip: { padding: 10 }
         }
     };
-    
-    createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
-    createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
-    createGroup('pv-w-cards', 'Power', 'W', 4, 'PV');
-    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
-    createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
-    createGroup('grid-w-cards', 'Power', 'W', 3, 'Grid');
+}
 
-    Chart.defaults.color = "#6b7490";
-    charts.overview = createChart('chart-overview', [
-        { label: 'PV Generation (W)', color: COLORS.pv },
+function switchTab(id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-btn--active'));
+    document.querySelectorAll('.tab-panel').forEach(c => c.hidden = true);
+    document.getElementById(`tab-btn-${id}`).classList.add('tab-btn--active');
+    document.getElementById(`tab-${id}`).hidden = false;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("tab-btn-overview").addEventListener("click", () => switchTab("overview"));
+    document.getElementById("tab-btn-pv").addEventListener("click", () => switchTab("pv"));
+    document.getElementById("tab-btn-grid").addEventListener("click", () => switchTab("grid"));
+    document.getElementById("tab-btn-battery").addEventListener("click", () => switchTab("battery"));
+
+    const toggleBtn = document.getElementById("theme-toggle");
+    if (toggleBtn) {
+        toggleBtn.addEventListener("click", cycleTheme);
+        const savedTheme = document.documentElement.dataset.theme || "light";
+        toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
+    }
+    
+    // Auto-create DOM cards for phase arrays
+    const createGroup = (id, label, unit, count, l_prefix) => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        for(let i=1; i<=count; i++) {
+            el.innerHTML += `<article class="card card--phase"><div class="card-label">${l_prefix} ${i} ${label}</div><div class="phase-value-group"><div class="card-value" id="${l_prefix.toLowerCase()}${i}-${unit.toLowerCase()}">—</div><div class="card-unit">${unit}</div></div></article>`;
+        }
+    };
+    createGroup('pv-cards-v', 'Voltage', 'V', 4, 'PV');
+    createGroup('pv-cards-a', 'Current', 'A', 4, 'PV');
+    createGroup('pv-cards-w', 'Power', 'W', 4, 'PV');
+    createGroup('grid-cards-v', 'Voltage', 'V', 3, 'Grid');
+    createGroup('grid-cards-a', 'Current', 'A', 3, 'Grid');
+    createGroup('grid-cards-w', 'Power', 'W', 3, 'Grid');
+
+    charts.overview = createChart('chart-power', [
+        { label: 'PV (W)', color: COLORS.pv },
         { label: 'Grid Net (W)', color: COLORS.grid },
         { label: 'Load (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
-        { label: 'String 1 (W)', color: COLORS.pv1 },
-        { label: 'String 2 (W)', color: COLORS.pv2 },
-        { label: 'String 3 (W)', color: COLORS.pv3 },
-        { label: 'String 4 (W)', color: COLORS.pv4 }
+        { label: 'S1 (W)', color: COLORS.pv1 }, { label: 'S2 (W)', color: COLORS.pv2 },
+        { label: 'S3 (W)', color: COLORS.pv3 }, { label: 'S4 (W)', color: COLORS.pv4 }
     ]);
     charts.grid = createChart('chart-grid', [
-        { label: 'L1 Power (W)', color: COLORS.l1 },
-        { label: 'L2 Power (W)', color: COLORS.l2 },
-        { label: 'L3 Power (W)', color: COLORS.l3 }
+        { label: 'L1 (W)', color: COLORS.l1 }, { label: 'L2 (W)', color: COLORS.l2 }, { label: 'L3 (W)', color: COLORS.l3 }
     ]);
     charts.battery = createChart('chart-battery', [
-        { label: 'Battery Power (W)', color: COLORS.load }
+        { label: 'Battery (W)', color: COLORS.load }
     ]);
 
     const tickClock = () => {
@@ -112,25 +127,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadHistory();
     connectSSE();
-    
-    // Prune data outside 24h window
-    setInterval(() => {
-        const cutoff = Date.now() - 24 * 3600 * 1000;
-        Object.values(charts).forEach(c => {
-            let keepIdx = 0;
-            while(keepIdx < c.data.labels.length && c.data.labels[keepIdx] < cutoff) keepIdx++;
-            if(keepIdx > 0) {
-                c.data.labels.splice(0, keepIdx);
-                c.data.datasets.forEach(ds => ds.data.splice(0, keepIdx));
-                c.update('none');
-            }
-        });
-    }, 60000);
+    recolorCharts();
 });
 
 function createChart(id, series) {
-    const ctx = document.getElementById(id).getContext('2d');
-    const opts = structuredClone(BASE_OPTS);
+    const el = document.getElementById(id);
+    if(!el) return null;
+    const ctx = el.getContext('2d');
+    const opts = getBaseOpts();
     return new Chart(ctx, {
         type: 'line',
         data: {
@@ -146,13 +150,7 @@ function createChart(id, series) {
 
 function updateDOM(id, val) {
     const el = document.getElementById(id);
-    if(el) {
-        if (el.innerText !== String(val)) {
-            el.innerText = val;
-            el.classList.add("value-updated");
-            setTimeout(() => el.classList.remove("value-updated"), 300);
-        }
-    }
+    if(el && el.innerText !== String(val)) el.innerText = val;
 }
 
 async function loadHistory() {
@@ -163,55 +161,30 @@ async function loadHistory() {
         if(data.length === 0) return;
         
         const labels = [];
-        const datasets = {
-            overview: [[], [], []],
-            pv: [[], [], [], []],
-            grid: [[], [], []],
-            battery: [[]]
-        };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[]], battery: [[]] };
         
         data.forEach(d => {
             labels.push(d.ts);
-            datasets.overview[0].push(d.pv_total_w_mean);
-            datasets.overview[1].push(d.meter_total_w_mean);
-            datasets.overview[2].push(d.load_p_mean);
-            
-            datasets.pv[0].push(d.pv1_w_mean);
-            datasets.pv[1].push(d.pv2_w_mean);
-            datasets.pv[2].push(d.pv3_w_mean);
-            datasets.pv[3].push(d.pv4_w_mean);
-            
-            datasets.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean);
-            datasets.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean);
-            datasets.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
-            
-            datasets.battery[0].push(d.bat_p_mean);
+            ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
+            ds.pv[0].push(d.pv1_w_mean); ds.pv[1].push(d.pv2_w_mean); ds.pv[2].push(d.pv3_w_mean); ds.pv[3].push(d.pv4_w_mean);
+            ds.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
+            ds.battery[0].push(d.bat_p_mean);
         });
         
         Object.keys(charts).forEach(k => {
+            if(!charts[k]) return;
             charts[k].data.labels = [...labels];
-            charts[k].data.datasets.forEach((ds, i) => ds.data = [...datasets[k][i]]);
+            charts[k].data.datasets.forEach((c, i) => c.data = [...ds[k][i]]);
             charts[k].update('none');
         });
-    } catch(e) {
-        console.error("History load failed", e);
-    }
+    } catch(e) {}
 }
 
 function pushChart(chart, ts, values) {
+    if(!chart) return;
     chart.data.labels.push(ts);
-    for(let i=0; i<values.length; i++) {
-        chart.data.datasets[i].data.push(values[i]);
-    }
+    for(let i=0; i<values.length; i++) chart.data.datasets[i].data.push(values[i]);
     chart.update('none');
-}
-
-function setFlowLine(id, active, isExport = false) {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.className = "flow-line";
-    if (active) el.classList.add("active");
-    if (isExport) el.classList.add("export");
 }
 
 function connectSSE() {
@@ -220,33 +193,15 @@ function connectSSE() {
         const d = JSON.parse(e.data);
         const ts = d.ts;
         
-        const statText = STATUS_MAP[d.status_code] || "UNKNOWN";
-        let statClass = "status-ok";
-        if (d.status_code === 0) statClass = "status-warn";
-        else if (d.status_code === 3 || d.status_code === 4) statClass = "status-err";
-
-        // Summary
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
-        document.getElementById("sum-pv-hint").innerHTML = `Status: <span class="${statClass}">${statText}</span>`;
+        updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
-        updateDOM("sum-grid-hint", d.meter_total_w >= 0 ? "Exporting" : "Importing");
-        document.getElementById("sum-grid-card").className = d.meter_total_w >= 0 ? "card card--returned" : "card card--delivered";
+        updateDOM("sum-grid-stat", d.meter_total_w >= 0 ? "Exporting" : "Importing");
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        updateDOM("sum-bat-hint", Math.abs(d.bat_p).toFixed(0) + " W " + (d.bat_p > 0 ? "Charging" : (d.bat_p < 0 ? "Discharging" : "Idle")));
+        updateDOM("sum-bat-stat", Math.abs(d.bat_p).toFixed(0) + " W");
+        updateDOM("sum-bat-w", d.bat_p.toFixed(0));
         updateDOM("sum-load", d.load_p.toFixed(0));
-
-        // Flow Diagram
-        updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
-        updateDOM("flow-grid", Math.abs(d.meter_total_w).toFixed(0) + " W");
-        updateDOM("flow-bat", Math.abs(d.bat_p).toFixed(0) + " W");
-        updateDOM("flow-load", d.load_p.toFixed(0) + " W");
-        updateDOM("flow-soc", d.bat_soc.toFixed(0) + "%");
-        document.getElementById("flow-inv").innerHTML = `<span class="${statClass}">${statText}</span>`;
-        
-        setFlowLine("line-pv-inv", d.pv_total_w > 10);
-        setFlowLine("line-inv-grid", Math.abs(d.meter_total_w) > 10, d.meter_total_w > 0);
-        setFlowLine("line-inv-bat", Math.abs(d.bat_p) > 10, d.bat_p < 0);
-        setFlowLine("line-inv-load", d.load_p > 10);
+        updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
 
         for(let i=1; i<=4; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
@@ -268,7 +223,7 @@ function connectSSE() {
         updateDOM("bat-v", d.bat_v.toFixed(1));
         updateDOM("bat-a", d.bat_i.toFixed(1));
         updateDOM("bat-w", d.bat_p.toFixed(0));
-        updateDOM("bat-soc2", d.bat_soc.toFixed(1));
+        updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
         pushChart(charts.overview, ts, [d.pv_total_w, d.meter_total_w, d.load_p]);
         pushChart(charts.pv, ts, [d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
