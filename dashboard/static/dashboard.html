@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Growatt Dashboard</title>
-  <link rel="stylesheet" href="/static/css/dashboard.css?v=3">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=4">
   <script>document.documentElement.dataset.theme = localStorage.getItem("hegg-theme") || "dark";</script>
   <style>
     .tab-content { display: none; }
@@ -19,9 +19,8 @@
     .tab-btn:hover { color: var(--text); background: var(--bg-hover); }
     .tab-btn.active { color: var(--primary); background: var(--primary-alpha); font-weight: 600; }
     
-    /* Cute Flow Diagram CSS */
     .power-flow {
-      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 2rem; margin-bottom: 2rem; position: relative;
     }
     .flow-container {
@@ -29,16 +28,15 @@
     }
     .flow-node {
       position: absolute; display: flex; flex-direction: column; align-items: center;
-      justify-content: center; width: 120px; height: 100px;
+      justify-content: center; width: 130px; height: 110px;
       background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
-      z-index: 10; font-weight: 500; font-size: 0.9rem;
+      z-index: 10; font-weight: 500; font-size: 0.95rem; color: var(--text);
     }
-    .flow-node .icon { font-size: 2rem; margin-bottom: 0.25rem; }
-    .flow-node .val { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.1rem; margin-top: 0.25rem; }
+    .flow-node .icon { font-size: 2.2rem; margin-bottom: 0.4rem; }
+    .flow-node .val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.2rem; margin-top: 0.25rem; color: var(--text); }
     
-    /* Positions */
     #node-pv { top: 20px; left: 0; }
-    #node-inv { top: 20px; left: 340px; border-color: var(--primary); }
+    #node-inv { top: 20px; left: 335px; border-color: var(--primary); }
     #node-grid { top: 20px; right: 0; }
     #node-bat { top: 180px; left: 160px; }
     #node-load { top: 180px; right: 160px; }
@@ -47,7 +45,7 @@
       position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;
     }
     .flow-line {
-      fill: none; stroke: var(--text-muted); stroke-width: 4; stroke-dasharray: 8; opacity: 0.3;
+      fill: none; stroke: var(--text-muted); stroke-width: 4; stroke-dasharray: 8; opacity: 0.2;
     }
     .flow-line.active {
       stroke: var(--primary); opacity: 0.8; animation: flowDash 1s linear infinite;
@@ -57,17 +55,20 @@
       to { stroke-dashoffset: -16; }
     }
     
-    .cards-row--four {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;
-    }
+    .cards-row--four { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
     .summary-strip { margin-bottom: 2rem; }
+    
+    .phase-value-group { display: flex; align-items: baseline; gap: 0.3rem; }
+    .status-ok { color: #22c55e; font-weight: 600; }
+    .status-warn { color: #f59e0b; font-weight: 600; }
+    .status-err { color: #ef4444; font-weight: 600; }
   </style>
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-text">Growatt</span>
+        <span class="logo-text">Growatt MOD 12KTL3</span>
       </div>
       <div class="header-controls">
         <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
@@ -76,31 +77,31 @@
   </header>
 
   <main class="main">
-    <!-- SUMMARY OVERVIEW -->
     <section class="summary-strip">
       <div class="cards-row cards-row--four">
         <article class="card card--delivered">
           <div class="card-label">Current Production</div>
-          <div class="card-value" id="sum-pv">— W</div>
+          <div class="phase-value-group"><div class="card-value" id="sum-pv">—</div><div class="card-unit">W</div></div>
+          <div class="card-hint" id="sum-pv-hint">WAITING</div>
         </article>
         <article class="card card--returned" id="sum-grid-card">
           <div class="card-label">Grid Power</div>
-          <div class="card-value" id="sum-grid">— W</div>
-          <div class="card-hint" id="sum-grid-hint">Import/Export</div>
+          <div class="phase-value-group"><div class="card-value" id="sum-grid">—</div><div class="card-unit">W</div></div>
+          <div class="card-hint" id="sum-grid-hint">Importing</div>
         </article>
         <article class="card card--net">
           <div class="card-label">Battery SOC</div>
-          <div class="card-value" id="sum-bat">— %</div>
+          <div class="phase-value-group"><div class="card-value" id="sum-bat">—</div><div class="card-unit">%</div></div>
           <div class="card-hint" id="sum-bat-hint">Idle</div>
         </article>
-        <article class="card">
+        <article class="card card--net" style="border-color:#a855f7">
           <div class="card-label">House Consumption</div>
-          <div class="card-value" id="sum-load">— W</div>
+          <div class="phase-value-group"><div class="card-value" id="sum-load" style="color:#a855f7">—</div><div class="card-unit">W</div></div>
+          <div class="card-hint">Live Load</div>
         </article>
       </div>
     </section>
 
-    <!-- TABS -->
     <nav class="tabs-nav">
       <button class="tab-btn active" data-target="tab-overview">Overview</button>
       <button class="tab-btn" data-target="tab-pv">PV Power</button>
@@ -108,7 +109,6 @@
       <button class="tab-btn" data-target="tab-battery">Battery Power</button>
     </nav>
 
-    <!-- TAB 1: OVERVIEW -->
     <section id="tab-overview" class="tab-content active">
       <div class="power-flow">
         <div class="flow-container">
@@ -116,62 +116,53 @@
             <span class="icon">☀️</span><span class="label">PV Array</span><span class="val" id="flow-pv">0 W</span>
           </div>
           <div class="flow-node" id="node-inv">
-            <span class="icon">⚡</span><span class="label">Inverter</span><span class="val" id="flow-inv">Live</span>
+            <span class="icon">⚡</span><span class="label">Inverter</span><span class="val" id="flow-inv">WAITING</span>
           </div>
           <div class="flow-node" id="node-grid">
             <span class="icon">🏢</span><span class="label">Grid</span><span class="val" id="flow-grid">0 W</span>
           </div>
           <div class="flow-node" id="node-bat">
-            <span class="icon">🔋</span><span class="label">Battery</span><span class="val" id="flow-bat">0 W</span>
+            <span class="icon">🔋</span><span class="label">Battery <span id="flow-soc">0%</span></span><span class="val" id="flow-bat">0 W</span>
           </div>
           <div class="flow-node" id="node-load">
             <span class="icon">🏠</span><span class="label">Load</span><span class="val" id="flow-load">0 W</span>
           </div>
           <svg class="flow-lines">
-            <path d="M 120 70 L 340 70" class="flow-line" id="line-pv-inv" />
-            <path d="M 460 70 L 680 70" class="flow-line" id="line-inv-grid" />
-            <path d="M 400 120 L 400 230 L 280 230" class="flow-line" id="line-inv-bat" />
-            <path d="M 400 120 L 400 230 L 520 230" class="flow-line" id="line-inv-load" />
+            <path d="M 130 75 L 335 75" class="flow-line" id="line-pv-inv" />
+            <path d="M 465 75 L 670 75" class="flow-line" id="line-inv-grid" />
+            <path d="M 400 130 L 400 235 L 290 235" class="flow-line" id="line-inv-bat" />
+            <path d="M 400 130 L 400 235 L 510 235" class="flow-line" id="line-inv-load" />
           </svg>
         </div>
       </div>
       <div class="chart-card"><div class="chart-wrapper"><canvas id="chart-overview"></canvas></div></div>
     </section>
 
-    <!-- TAB 2: PV Power -->
     <section id="tab-pv" class="tab-content">
       <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-pv"></canvas></div></div>
-      <h3 class="section-title">PV Voltage</h3>
-      <div class="cards-row cards-row--four" id="pv-v-cards"></div>
-      <h3 class="section-title">PV Current</h3>
-      <div class="cards-row cards-row--four" id="pv-a-cards"></div>
-      <h3 class="section-title">PV Power</h3>
-      <div class="cards-row cards-row--four" id="pv-w-cards"></div>
+      <h3 class="section-title">PV Voltage</h3><div class="cards-row cards-row--four" id="pv-v-cards"></div>
+      <h3 class="section-title">PV Current</h3><div class="cards-row cards-row--four" id="pv-a-cards"></div>
+      <h3 class="section-title">PV Power</h3><div class="cards-row cards-row--four" id="pv-w-cards"></div>
     </section>
 
-    <!-- TAB 3: GRID POWER -->
     <section id="tab-grid" class="tab-content">
       <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-grid"></canvas></div></div>
-      <h3 class="section-title">Grid Voltage</h3>
-      <div class="cards-row cards-row--four" id="grid-v-cards"></div>
-      <h3 class="section-title">Grid Current</h3>
-      <div class="cards-row cards-row--four" id="grid-a-cards"></div>
-      <h3 class="section-title">Grid Power</h3>
-      <div class="cards-row cards-row--four" id="grid-w-cards"></div>
+      <h3 class="section-title">Grid Voltage</h3><div class="cards-row cards-row--four" id="grid-v-cards"></div>
+      <h3 class="section-title">Grid Current</h3><div class="cards-row cards-row--four" id="grid-a-cards"></div>
+      <h3 class="section-title">Grid Power</h3><div class="cards-row cards-row--four" id="grid-w-cards"></div>
     </section>
 
-    <!-- TAB 4: BATTERY POWER -->
     <section id="tab-battery" class="tab-content">
       <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-battery"></canvas></div></div>
       <div class="cards-row cards-row--four">
-        <article class="card"><div class="card-label">Battery Voltage</div><div class="card-value" id="bat-v">— V</div></article>
-        <article class="card"><div class="card-label">Battery Current</div><div class="card-value" id="bat-a">— A</div></article>
-        <article class="card"><div class="card-label">Battery Power</div><div class="card-value" id="bat-w">— W</div></article>
-        <article class="card"><div class="card-label">Battery SOC</div><div class="card-value" id="bat-soc2">— %</div></article>
+        <article class="card"><div class="card-label">Battery Voltage</div><div class="phase-value-group"><div class="card-value" id="bat-v">—</div><div class="card-unit">V</div></div></article>
+        <article class="card"><div class="card-label">Battery Current</div><div class="phase-value-group"><div class="card-value" id="bat-a">—</div><div class="card-unit">A</div></div></article>
+        <article class="card"><div class="card-label">Battery Power</div><div class="phase-value-group"><div class="card-value" id="bat-w">—</div><div class="card-unit">W</div></div></article>
+        <article class="card"><div class="card-label">Battery SOC</div><div class="phase-value-group"><div class="card-value" id="bat-soc2">—</div><div class="card-unit">%</div></div></article>
       </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="/static/js/dashboard.js?v=3"></script>
+  <script src="/static/js/dashboard.js?v=4"></script>
 </body>
 </html>
