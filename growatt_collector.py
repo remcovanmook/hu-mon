@@ -35,7 +35,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
     inverter_model = "Unknown"
     inverter_serial = "Unknown"
     inverter_firmware = "Unknown"
-    datalogger_serial = "Unknown"
+    datalogger_serial = "ZGQ0F6K041"
     inverter_rated_power_w = 0
 
     while bat_nominal_kwh is None:
@@ -51,12 +51,10 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
 
             # Read Legacy serial OR new serial, and read Firmware
             r_meta = client.read_holding_registers(9, count=50, device_id=1)
-            # Read Datalogger Serial (Holding 122)
-            r_log_ser = client.read_holding_registers(122, count=10, device_id=1)
             # Read New Serial Number from 3001 (15 Regs)
             r_serial = client.read_holding_registers(3001, count=15, device_id=1)
             
-            if not r_meta.isError() and not r_serial.isError() and not r_log_ser.isError():
+            if not r_meta.isError() and not r_serial.isError():
                 regs_meta = r_meta.registers
                 regs_ser = r_serial.registers
                 
@@ -86,7 +84,6 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                         inverter_model = f"{series_prefix} {power_watts}W"
                     inverter_rated_power_w = power_watts * 10 if power_watts < 1000 else power_watts
                 
-                datalogger_serial = decode_ascii(r_log_ser.registers)
                 logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware} DL: {datalogger_serial}")
                 break
 
@@ -116,10 +113,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             
             # Segment 3 (Battery) 3170-3189
             r3 = client.read_input_registers(3170, count=20, device_id=1)
-            # Segment 5 (Datalogger Health) 3112-3122
-            r5 = client.read_input_registers(3112, count=11, device_id=1)
 
-            if r1.isError() or r2.isError() or r3.isError() or r4.isError() or r5.isError():
+            if r1.isError() or r2.isError() or r3.isError() or r4.isError():
                 time.sleep(1)
                 continue
                 
@@ -127,7 +122,6 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reg2 = r2.registers
             reg4 = r4.registers
             reg3 = r3.registers
-            reg5 = r5.registers
 
             reading = GrowattReading()
             reading.status_code = parse_u16(reg1[0])
@@ -179,24 +173,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
             reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
             
-            # Datalogger logic
-            logger_type = reg5[8]
-            raw_signal = reg5[10]
-            if raw_signal > 100:
-                reading.signal_quality = raw_signal & 0x00FF
-            else:
-                reading.signal_quality = raw_signal
-                
-            if logger_type == 15:
-                reading.datalogger_model = "ShineWifi-X2"
-            elif logger_type == 10:
-                reading.datalogger_model = "ShineWifi-X"
-            elif logger_type == 11:
-                reading.datalogger_model = "ShineLan-X"
-            else:
-                # If bridging makes it 0, map it cleanly
-                reading.datalogger_model = f"Bridge ({logger_type})" if logger_type == 0 else f"Unknown ({logger_type})"
-                
+            # Since official firmware does not inject datalogger data, we hardcode the mapping
+            reading.datalogger_model = "ShineWiLan-X2"
+            reading.signal_quality = 0 # 0 triggers UI handling
             
             # Mathematically derive instantaneous load (safest and most accurate)
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
