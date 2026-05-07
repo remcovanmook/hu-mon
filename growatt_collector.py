@@ -47,8 +47,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 time.sleep(2)
                 continue
 
-            # Also read metadata (9-35 = 27 registers)
-            r_meta = client.read_holding_registers(9, count=27, device_id=1)
+            # Also read metadata (9-58 = 50 registers)
+            r_meta = client.read_holding_registers(9, count=50, device_id=1)
             if not r_meta.isError():
                 regs = r_meta.registers
                 def decode_ascii(reg_list):
@@ -60,6 +60,11 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 inverter_firmware = decode_ascii(regs[0:6])     # 9-14
                 inverter_serial = decode_ascii(regs[14:19])     # 23-27
                 inverter_model = decode_ascii(regs[19:27])      # 28-35
+                
+                # Dump raw registers so the AI can analyze them for the correct offsets
+                import json
+                with open("meta_dump.json", "w") as f:
+                    json.dump(regs, f)
                 
                 # Incase the firmware is empty, or model is garbage, keep them safe
                 if not inverter_model.strip(): inverter_model = "Growatt Inverter"
