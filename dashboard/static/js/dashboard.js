@@ -54,15 +54,16 @@ function updateSparklineAnnotations(chart, min, max, color) {
   if(!chart) return;
   const cStr = typeof color === 'string' && color.startsWith('#') ? color + '80' : color;
   const bg = typeof color === 'string' && color.startsWith('#') ? color + 'd0' : 'rgba(100,100,100,0.8)';
-  chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations,
-    minLine: {
+  if (!chart.options.plugins.annotation) chart.options.plugins.annotation = { annotations: {} };
+  const anns = chart.options.plugins.annotation.annotations;
+  
+  anns.minLine = {
       type: 'line', yMin: min, yMax: min, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
       label: { display: true, content: min.toFixed(1), position: 'end', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
-    },
-    maxLine: {
+  };
+  anns.maxLine = {
       type: 'line', yMin: max, yMax: max, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
       label: { display: true, content: max.toFixed(1), position: 'start', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
-    }
   };
 }
 
@@ -390,7 +391,10 @@ async function loadHistory(hours = 24) {
             ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
             ds.eps[0].push(Math.round(d.eps_p_mean)); ds.eps[1].push(Math.round(d.eps_l1_v_mean * d.eps_l1_a_mean)); ds.eps[2].push(Math.round(d.eps_l2_v_mean * d.eps_l2_a_mean)); ds.eps[3].push(Math.round(d.eps_l3_v_mean * d.eps_l3_a_mean));
-            ds.freq[0].push(d.grid_freq_mean); ds.invTemp[0].push(d.inverter_temp_mean); ds.bstTemp[0].push(d.boost_temp_mean);
+            let freq = d.grid_freq_mean === 0 ? null : d.grid_freq_mean;
+            let inv = d.inverter_temp_mean === 0 ? null : d.inverter_temp_mean;
+            let bst = d.boost_temp_mean === 0 ? null : d.boost_temp_mean;
+            ds.freq[0].push(freq); ds.invTemp[0].push(inv); ds.bstTemp[0].push(bst);
             
             for(let i=1; i<=4; i++) {
                 let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
@@ -422,7 +426,7 @@ async function loadHistory(hours = 24) {
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
-            charts[k].options.plugins.annotation.annotations = { ...statusAnnotations };
+            charts[k].options.plugins.annotation.annotations = Object.assign({}, statusAnnotations);
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
         });
@@ -685,11 +689,15 @@ function connectSSE() {
         updateDOM("sum-eps-val", Math.abs(d.eps_p).toFixed(0));
         pushChart(charts.eps, ts, [Math.round(d.eps_p), Math.round(e1w), Math.round(e2w), Math.round(e3w)]);
         
-        updateDOM("val-freq", (d.grid_freq !== undefined ? d.grid_freq.toFixed(2) + " Hz" : "—"));
-        updateDOM("val-inv-temp", (d.inverter_temp !== undefined ? d.inverter_temp.toFixed(1) + " °C" : "—"));
-        updateDOM("val-bst-temp", (d.boost_temp !== undefined ? d.boost_temp.toFixed(1) + " °C" : "—"));
-        pushChart(charts.freq, ts, [d.grid_freq]);
-        pushChart(charts.invTemp, ts, [d.inverter_temp]);
-        pushChart(charts.bstTemp, ts, [d.boost_temp]);
+        let freq = (d.grid_freq !== undefined && d.grid_freq !== 0) ? d.grid_freq : null;
+        let inv = (d.inverter_temp !== undefined && d.inverter_temp !== 0) ? d.inverter_temp : null;
+        let bst = (d.boost_temp !== undefined && d.boost_temp !== 0) ? d.boost_temp : null;
+        
+        updateDOM("val-freq", (freq !== null ? freq.toFixed(2) + " Hz" : "—"));
+        updateDOM("val-inv-temp", (inv !== null ? inv.toFixed(1) + " °C" : "—"));
+        updateDOM("val-bst-temp", (bst !== null ? bst.toFixed(1) + " °C" : "—"));
+        pushChart(charts.freq, ts, [freq]);
+        pushChart(charts.invTemp, ts, [inv]);
+        pushChart(charts.bstTemp, ts, [bst]);
     });
 }
