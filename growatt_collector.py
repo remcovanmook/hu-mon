@@ -27,8 +27,24 @@ def parse_s32(high, low):
     return val - 0x100000000 if val > 0x7FFFFFFF else val
 
 def poll_datalogger(ip: str, port: int, store: GrowattStore):
-    client = ModbusTcpClient(ip, port=port, timeout=3.0)
+    client = ModbusTcpClient(ip, port=port)
+    client.connect()
     
+    # Read static configuration once at startup
+    bat_nominal_kwh = 0.0
+    while bat_nominal_kwh == 0.0:
+        try:
+            r_config = client.read_holding_registers(1005, count=1, device_id=1)
+            if not r_config.isError():
+                bat_nominal_kwh = r_config.registers[0] / 10.0
+                logging.info(f"Discovered APX Battery Capacity: {bat_nominal_kwh} kWh")
+            else:
+                logging.warning("Failed to read battery capacity, retrying...")
+                time.sleep(2)
+        except Exception as e:
+            logging.warning(f"Error reading config: {e}")
+            time.sleep(2)
+
     while True:
         start_time = time.time()
         try:
@@ -106,6 +122,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             
             # Use native house load register (3048-49)
             reading.load_p = parse_u32(reg2[18], reg2[19]) / 10.0
+            reading.bat_nominal_kwh = bat_nominal_kwh
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
             raw_dict = {}

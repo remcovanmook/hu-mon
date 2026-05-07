@@ -206,8 +206,16 @@ function connectSSE() {
         updateDOM("sum-grid-total", d.grid_export_today_kwh.toFixed(0));
 
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        updateDOM("sum-bat-kwh", "—");
-        updateDOM("sum-bat-autonomy", "—");
+        
+        if (d.bat_nominal_kwh > 0) {
+            const bat_kwh = (d.bat_soc / 100.0) * d.bat_nominal_kwh;
+            updateDOM("sum-bat-kwh", bat_kwh.toFixed(1));
+            const autonomy = d.load_p > 0 ? (bat_kwh * 1000 / d.load_p).toFixed(1) : "—";
+            updateDOM("sum-bat-autonomy", autonomy);
+        } else {
+            updateDOM("sum-bat-kwh", "—");
+            updateDOM("sum-bat-autonomy", "—");
+        }
         
         updateDOM("sum-load", d.load_p.toFixed(0));
         updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));

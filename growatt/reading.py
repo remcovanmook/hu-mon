@@ -42,6 +42,7 @@ class GrowattReading:
     bat_v: float = 0.0
     bat_i: float = 0.0
     bat_p: float = 0.0  # pos: charge, neg: discharge
+    bat_nominal_kwh: float = 0.0  # Nominal battery capacity
     load_p: float = 0.0
     eps_p: float = 0.0
     

@@ -5,13 +5,13 @@ This document provides the full technical specification for interacting with the
 # Growatt 12KTL3-HU Interaction Specification
 **Interface:** Modbus TCP via ShineWifi-X2  
 **Protocol Version:** Growatt Modbus RTU Protocol II (Storage/Hybrid)  
-**Port:** `5020`
+**Port:** `502`
 
 ## 1. Connection Parameters
 | Parameter | Value | Notes |
 | :--- | :--- | :--- |
 | **Transport** | TCP/IP | Local Network |
-| **Port** | `5020` | Specific to X2 series local Modbus |
+| **Port** | `502` | Specific to X2 series local Modbus |
 | **Slave ID** | `1` | Default (Adjustable in Inverter LCD settings) |
 | **Byte Order** | Big-Endian | High Byte first, then Low Byte |
 | **Register Order** | Big-Endian | High Register first (for 32-bit values) |
