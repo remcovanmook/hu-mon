@@ -32,9 +32,11 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
     
     # Read static configuration once at startup
     bat_nominal_kwh = None
-    inverter_model = ""
-    inverter_serial = ""
-    inverter_firmware = ""
+    inverter_model = "Unknown"
+    inverter_serial = "Unknown"
+    inverter_firmware = "Unknown"
+    datalogger_serial = "Unknown"
+    inverter_rated_power_w = 0
 
     while bat_nominal_kwh is None:
         try:
@@ -72,6 +74,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 if module_id == 0:
                     # Fallback if Modbus proxy zeros it out
                     inverter_model = "MOD 12KTL3-HU"
+                    inverter_rated_power_w = 12000
                 else:
                     series_code = (module_id >> 16) & 0xFFFF
                     power_watts = module_id & 0xFFFF
@@ -81,6 +84,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                         inverter_model = f"{series_prefix} {int(power_watts/1000)}KTL3-HU"
                     else:
                         inverter_model = f"{series_prefix} {power_watts}W"
+                    inverter_rated_power_w = power_watts * 10 if power_watts < 1000 else power_watts
                 
                 datalogger_serial = decode_ascii(r_log_ser.registers)
                 logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware} DL: {datalogger_serial}")
@@ -201,6 +205,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.inverter_serial = inverter_serial
             reading.inverter_firmware = inverter_firmware
             reading.datalogger_serial = datalogger_serial
+            reading.rated_power_w = inverter_rated_power_w
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
             raw_dict = {}

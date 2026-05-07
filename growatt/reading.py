@@ -62,6 +62,7 @@ class GrowattReading:
     datalogger_model: str = ""
     datalogger_serial: str = ""
     signal_quality: int = 0
+    rated_power_w: int = 0
 
     
     # Raw payload cache for the Proxy
