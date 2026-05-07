@@ -510,6 +510,8 @@ function connectSSE() {
         updateDOM("meta-rated", (d.rated_power_w ? (d.rated_power_w / 1000).toFixed(1) + " kW" : "—"));
         updateDOM("meta-e-today", d.pv_today_kwh.toFixed(1) + " kWh");
         updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
+        updateDOM("meta-temp", (d.inverter_temp !== undefined ? d.inverter_temp.toFixed(1) + " °C" : "—"));
+        updateDOM("meta-fault", (d.fault_code !== undefined ? d.fault_code : "—"));
 
         const flooredMin = Date.now() - currentHours * 3600000;
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";

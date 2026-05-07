@@ -66,6 +66,8 @@ class GrowattReading:
     inverter_serial: str = ""
     inverter_firmware: str = ""
     rated_power_w: int = 0
+    inverter_temp: float = 0.0
+    fault_code: int = 0
 
     
     # Raw payload cache for the Proxy
