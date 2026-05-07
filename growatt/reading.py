@@ -59,6 +59,8 @@ class GrowattReading:
     inverter_model: str = ""
     inverter_serial: str = ""
     inverter_firmware: str = ""
+    datalogger_model: str = ""
+    signal_quality: int = 0
 
     
     # Raw payload cache for the Proxy

@@ -105,17 +105,21 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
 
             # Segment 4 (Meter/EPS) 3120-3128
             r4 = client.read_input_registers(3120, count=9, device_id=1)
-            if r4.isError(): raise ModbusIOException("Failed to read Segment 4 (3120)")
-            time.sleep(0.05)
             
             # Segment 3 (Battery) 3170-3189
             r3 = client.read_input_registers(3170, count=20, device_id=1)
-            if r3.isError(): raise ModbusIOException("Failed to read Segment 3 (3170)")
-            
+            # Segment 5 (Datalogger Health) 3112-3122
+            r5 = client.read_input_registers(3112, count=11, device_id=1)
+
+            if r1.isError() or r2.isError() or r3.isError() or r4.isError() or r5.isError():
+                time.sleep(1)
+                continue
+                
             reg1 = r1.registers
             reg2 = r2.registers
             reg4 = r4.registers
             reg3 = r3.registers
+            reg5 = r5.registers
 
             reading = GrowattReading()
             reading.status_code = parse_u16(reg1[0])
@@ -166,6 +170,18 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.load_today_kwh = parse_u32(reg3[18], reg3[19]) / 10.0
             reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
             reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
+            
+            # Datalogger
+            logger_type = reg5[8]
+            reading.signal_quality = reg5[10]
+            if logger_type == 15:
+                reading.datalogger_model = "ShineWifi-X2"
+            elif logger_type == 10:
+                reading.datalogger_model = "ShineWifi-X"
+            elif logger_type == 11:
+                reading.datalogger_model = "ShineLan-X"
+            else:
+                reading.datalogger_model = f"Unknown ({logger_type})"
             
             # Mathematically derive instantaneous load (safest and most accurate)
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
