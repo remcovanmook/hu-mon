@@ -140,8 +140,14 @@ function createChart(id, series) {
         data: {
             labels: [],
             datasets: series.map(s => ({
-                label: s.label, borderColor: s.color, backgroundColor: s.color + '22',
-                data: [], fill: false, tension: 0.3, pointRadius: 0
+                label: s.label, 
+                borderColor: s.color, 
+                backgroundColor: s.color + '33', // 20% opacity fill
+                data: [], 
+                fill: true, 
+                tension: 0.4, 
+                pointRadius: 0,
+                borderWidth: 2
             }))
         },
         options: opts
@@ -225,6 +231,17 @@ function connectSSE() {
 
 
         
+        
+        // Metadata
+        updateDOM("meta-model", d.inverter_model || "—");
+        updateDOM("meta-serial", d.inverter_serial || "—");
+        updateDOM("meta-fw", d.inverter_firmware || "—");
+        const statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+        updateDOM("meta-status", statusStr);
+        
+        const sl = document.getElementById("status-label");
+        if(sl) sl.innerText = statusStr;
+
         // --- Cute Flow Diagram Animation ---
         updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
         updateDOM("flow-grid", Math.abs(d.meter_total_w).toFixed(0) + " W");

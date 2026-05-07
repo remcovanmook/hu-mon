@@ -55,6 +55,11 @@ class GrowattReading:
     bat_charge_today_kwh: float = 0.0
     bat_discharge_today_kwh: float = 0.0
 
+    # Metadata
+    inverter_model: str = ""
+    inverter_serial: str = ""
+    inverter_firmware: str = ""
+
     
     # Raw payload cache for the Proxy
     raw_payload: bytes = b''

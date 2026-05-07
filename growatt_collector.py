@@ -32,6 +32,10 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
     
     # Read static configuration once at startup
     bat_nominal_kwh = None
+    inverter_model = ""
+    inverter_serial = ""
+    inverter_firmware = ""
+
     while bat_nominal_kwh is None:
         try:
             r_config = client.read_holding_registers(1005, count=1, device_id=1)
@@ -41,6 +45,23 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             else:
                 logging.warning("Failed to read battery capacity, retrying...")
                 time.sleep(2)
+                continue
+
+            # Also read metadata (9-32 = 24 registers)
+            r_meta = client.read_holding_registers(9, count=24, device_id=1)
+            if not r_meta.isError():
+                regs = r_meta.registers
+                def decode_ascii(reg_list):
+                    b = bytearray()
+                    for r in reg_list:
+                        b.extend(r.to_bytes(2, 'big'))
+                    return b.decode('ascii', 'ignore').strip(' \x00')
+                
+                inverter_firmware = decode_ascii(regs[0:6])
+                inverter_model = decode_ascii(regs[6:14])
+                inverter_serial = decode_ascii(regs[14:24])
+                logging.info(f"Discovered Device: {inverter_model} ({inverter_serial}) FW: {inverter_firmware}")
+
         except Exception as e:
             logging.warning(f"Error reading config: {e}")
             time.sleep(2)
@@ -129,6 +150,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             # Mathematically derive instantaneous load (safest and most accurate)
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
             reading.bat_nominal_kwh = bat_nominal_kwh
+            reading.inverter_model = inverter_model
+            reading.inverter_serial = inverter_serial
+            reading.inverter_firmware = inverter_firmware
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
             raw_dict = {}
