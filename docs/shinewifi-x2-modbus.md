@@ -34,9 +34,10 @@ These registers are Read-Only and provide real-time telemetry.
 | Function Code | Address | Name | Type | Unit | Scale | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **METADATA** | *(Read Once)* | | | | | |
-| 03 (Hold) | 28–35 | Model Name | ASCII | — | — | 16-char Inverter Model |
-| 03 (Hold) | 23–27 | Serial Number | ASCII | — | — | 10-char Inverter Serial Number |
 | 03 (Hold) | 9–14 | Firmware Ver | U16×6 | — | — | System Firmware versions |
+| 03 (Hold) | 28–29 | Module ID | U32 | — | — | Algorithmic Series + Power ID |
+| 03 (Hold) | 121 | Device Type | U16 | — | — | 6: Storage/Hybrid |
+| 03 (Hold) | 3001-15 | New Serial | ASCII | — | — | 30-char Inverter Serial Number |
 | **SYSTEM STATE** | | | | | | |
 | 04 (Input) | 3000 | Inverter Status | U16 | — | 1 | 0:Wait, 1:Normal, 3:Fault |
 | 04 (Input) | 3091 | Fault Code | U16 | — | 1 | Main Error code (0 = None) |

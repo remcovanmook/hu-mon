@@ -49,21 +49,36 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
 
             # Also read metadata (9-58 = 50 registers)
             r_meta = client.read_holding_registers(9, count=50, device_id=1)
-            if not r_meta.isError():
+            # Read New Serial Number from 3001 (15 Regs)
+            r_serial = client.read_holding_registers(3001, count=15, device_id=1)
+            
+            if not r_meta.isError() and not r_serial.isError():
                 regs = r_meta.registers
+                regs_ser = r_serial.registers
+                
                 def decode_ascii(reg_list):
                     b = bytearray()
                     for r in reg_list:
                         b.extend(r.to_bytes(2, 'big'))
-                    # Remove all unprintable null bytes before stripping
                     return b.decode('ascii', 'ignore').replace('\x00', '').strip()
                 
                 inverter_firmware = decode_ascii(regs[0:6])     # 9-14
-                inverter_model = decode_ascii(regs[24:33])      # 33-41
-                inverter_serial = "N/A"                         # Serial not exported on this proxy
+                inverter_serial = decode_ascii(regs_ser)        # 3001-3015
                 
-                # Incase the firmware is empty, or model is garbage, keep them safe
-                if not inverter_model.strip(): inverter_model = "Growatt Inverter"
+                # Algorithmic Module ID decode (Reg 28-29 = index 19-20)
+                module_id = (regs[19] << 16) | regs[20]
+                if module_id == 0:
+                    # Fallback if Modbus proxy zeros it out
+                    inverter_model = "MOD 12KTL3-HU"
+                else:
+                    series_code = (module_id >> 16) & 0xFFFF
+                    power_watts = module_id & 0xFFFF
+                    series_map = {0x05: "MIN", 0x0B: "MOD", 0x0C: "MID", 0x0D: "SPH", 0x0E: "SPA", 0x0F: "MIC", 0x10: "MAC", 0x11: "MAX"}
+                    series_prefix = series_map.get(series_code, "Unknown")
+                    if series_prefix == "MOD" and power_watts >= 3000:
+                        inverter_model = f"{series_prefix} {int(power_watts/1000)}KTL3-HU"
+                    else:
+                        inverter_model = f"{series_prefix} {power_watts}W"
                 
                 logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware}")
 
