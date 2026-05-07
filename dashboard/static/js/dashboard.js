@@ -220,11 +220,7 @@ function connectSSE() {
         updateDOM("sum-load", d.load_p.toFixed(0));
         updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
         
-        // Exact per-phase load derived from meter phase data + symmetric inverter assumption
-        const inv_per_phase = (d.load_p + d.meter_total_w) / 3;
-        updateDOM("sum-load-l1", (inv_per_phase - (d.meter_l1_w || 0)).toFixed(0));
-        updateDOM("sum-load-l2", (inv_per_phase - (d.meter_l2_w || 0)).toFixed(0));
-        updateDOM("sum-load-l3", (inv_per_phase - (d.meter_l3_w || 0)).toFixed(0));
+        // Explicitly ignoring L1/L2/L3 house load splits since we cannot derive them purely from the Modbus data without assumptions
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
 
 
