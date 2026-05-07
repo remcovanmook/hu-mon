@@ -104,8 +104,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_export_today_kwh = parse_u32(reg3[16], reg3[17]) / 10.0
             reading.load_today_kwh = parse_u32(reg3[18], reg3[19]) / 10.0
             
-            # Mathematically derive instantaneous load since the register acts as a cumulative counter
-            reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
+            # Use native house load register (3048-49)
+            reading.load_p = parse_u32(reg2[18], reg2[19]) / 10.0
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
             raw_dict = {}
