@@ -88,19 +88,49 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Auto-create DOM cards for phase arrays
-    const createGroup = (id, label, unit, count, l_prefix) => {
-        const el = document.getElementById(id);
-        if(!el) return;
-        for(let i=1; i<=count; i++) {
-            el.innerHTML += `<article class="card card--phase"><div class="card-label">${l_prefix} ${i} ${label}</div><div class="phase-value-group"><div class="card-value" id="${l_prefix.toLowerCase()}${i}-${unit.toLowerCase()}">—</div><div class="card-unit">${unit}</div></div></article>`;
+    const pvEl = document.getElementById('pv-string-cards');
+    if (pvEl) {
+        for(let i=1; i<=4; i++) {
+            pvEl.innerHTML += `
+            <article class="card">
+              <div class="card-label" style="border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">PV String ${i}</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Voltage</span>
+                <span style="font-weight: 500;" id="pv${i}-v">— V</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Current</span>
+                <span style="font-weight: 500;" id="pv${i}-a">— A</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Power</span>
+                <span style="font-weight: 600; color: var(--pv${i}-color, var(--pv1));" id="pv${i}-w">— W</span>
+              </div>
+            </article>`;
         }
-    };
-    createGroup('pv-cards-v', 'Voltage', 'V', 4, 'PV');
-    createGroup('pv-cards-a', 'Current', 'A', 4, 'PV');
-    createGroup('pv-cards-w', 'Power', 'W', 4, 'PV');
-    createGroup('grid-cards-v', 'Voltage', 'V', 3, 'Grid');
-    createGroup('grid-cards-a', 'Current', 'A', 3, 'Grid');
-    createGroup('grid-cards-w', 'Power', 'W', 3, 'Grid');
+    }
+    
+    const gridEl = document.getElementById('grid-phase-cards');
+    if (gridEl) {
+        for(let i=1; i<=3; i++) {
+            gridEl.innerHTML += `
+            <article class="card">
+              <div class="card-label" style="border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">Grid Phase L${i}</div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Voltage</span>
+                <span style="font-weight: 500;" id="grid${i}-v">— V</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Current</span>
+                <span style="font-weight: 500;" id="grid${i}-a">— A</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Power</span>
+                <span style="font-weight: 600; color: var(--phase-l${i}, var(--l1));" id="grid${i}-w">— W</span>
+              </div>
+            </article>`;
+        }
+    }
 
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
@@ -272,6 +302,17 @@ function connectSSE() {
 
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
         updateDOM("meta-status", statusStr);
+        
+        for (let i = 1; i <= 4; i++) {
+            updateDOM(`pv${i}-v`, (d[`pv${i}_v`] || 0).toFixed(1));
+            updateDOM(`pv${i}-a`, (d[`pv${i}_a`] || 0).toFixed(1));
+            updateDOM(`pv${i}-w`, (d[`pv${i}_w`] || 0).toFixed(0));
+        }
+        for (let i = 1; i <= 3; i++) {
+            updateDOM(`grid${i}-v`, (d[`grid_l${i}_v`] || 0).toFixed(1));
+            updateDOM(`grid${i}-a`, (d[`grid_l${i}_a`] || 0).toFixed(1));
+            updateDOM(`grid${i}-w`, Math.abs(d[`meter_l${i}_w`] || 0).toFixed(0));
+        }
         
         const sl = document.getElementById("status-label");
         if(sl) sl.innerText = statusStr;
