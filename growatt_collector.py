@@ -102,8 +102,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r1.isError(): raise ModbusIOException("Failed to read Segment 1 (3000)")
             time.sleep(0.05)
             
-            # Segment 2 (Grid/Load) 3030-3059
-            r2 = client.read_input_registers(3030, count=30, device_id=1)
+            # Segment 2 (Grid) 3030-3109
+            r2 = client.read_input_registers(3030, count=80, device_id=1)
             if r2.isError(): raise ModbusIOException("Failed to read Segment 2 (3030)")
             time.sleep(0.05)
 
