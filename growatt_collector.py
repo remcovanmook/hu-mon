@@ -107,8 +107,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r2.isError(): raise ModbusIOException("Failed to read Segment 2 (3030)")
             time.sleep(0.05)
 
-            # Segment 4 (Meter/EPS/Temp) 3114-3154
-            r4 = client.read_input_registers(3114, count=41, device_id=1)
+            # Segment 4 (Meter/EPS/Temp) 3110-3154
+            r4 = client.read_input_registers(3110, count=45, device_id=1)
             
             # Segment 5 (Low Block Mirror Hunt) 0-124
             r5 = client.read_input_registers(0, count=125, device_id=1)
@@ -167,27 +167,27 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 
             reading.fault_code = parse_u16(reg2[61])
             
-            # Segment 4 contains Temp, EPS and Meter. Starts at 3114.
-            reg4 = r4.registers if len(r4.registers) >= 41 else [0]*41
+            # Segment 4 contains Temp, EPS and Meter. Starts at 3110.
+            reg4 = r4.registers if len(r4.registers) >= 45 else [0]*45
             
             reading.inverter_temp = parse_u16(reg4[0]) / 10.0
             
-            # 3118 is reg4[4]
-            reading.eps_l1_v = parse_u16(reg4[4]) / 10.0
+            # 3118 is reg4[8]
+            reading.eps_l1_v = parse_u16(reg4[8]) / 10.0
             
-            # 3120 is reg4[6]
-            reading.eps_p = parse_u32(reg4[6], reg4[7]) / 10.0
-            reading.meter_total_w = parse_s32(reg4[7], reg4[8]) / 10.0
+            # 3120 is reg4[10]
+            reading.eps_p = parse_u32(reg4[10], reg4[11]) / 10.0
+            reading.meter_total_w = parse_s32(reg4[11], reg4[12]) / 10.0
             
-            # 3130 is reg4[16]
-            reading.eps_l2_v = parse_u16(reg4[16]) / 10.0
-            reading.eps_l1_a = parse_u16(reg4[17]) / 10.0  # 3131
-            reading.eps_l3_v = parse_u16(reg4[18]) / 10.0  # 3132
-            reading.eps_l2_a = parse_u16(reg4[19]) / 10.0  # 3133
-            reading.eps_l3_a = parse_u16(reg4[21]) / 10.0  # 3135
-            reading.meter_l1_w = parse_s32(reg4[9], reg4[10]) / 10.0
-            reading.meter_l2_w = parse_s32(reg4[11], reg4[12]) / 10.0
-            reading.meter_l3_w = parse_s32(reg4[13], reg4[14]) / 10.0
+            # 3130 is reg4[20]
+            reading.eps_l2_v = parse_u16(reg4[20]) / 10.0
+            reading.eps_l1_a = parse_u16(reg4[21]) / 10.0  # 3131
+            reading.eps_l3_v = parse_u16(reg4[22]) / 10.0  # 3132
+            reading.eps_l2_a = parse_u16(reg4[23]) / 10.0  # 3133
+            reading.eps_l3_a = parse_u16(reg4[25]) / 10.0  # 3135
+            reading.meter_l1_w = parse_s32(reg4[13], reg4[14]) / 10.0
+            reading.meter_l2_w = parse_s32(reg4[15], reg4[16]) / 10.0
+            reading.meter_l3_w = parse_s32(reg4[17], reg4[18]) / 10.0
             
             reading.bat_soc = parse_u16(reg3[0])
             reading.bat_v = parse_u16(reg3[1]) / 10.0
@@ -219,7 +219,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             raw_dict = {}
             for i, val in enumerate(reg1): raw_dict[str(3000 + i)] = val
             for i, val in enumerate(reg2): raw_dict[str(3030 + i)] = val
-            for i, val in enumerate(reg4): raw_dict[str(3114 + i)] = val
+            for i, val in enumerate(reg4): raw_dict[str(3110 + i)] = val
             for i, val in enumerate(reg3): raw_dict[str(3170 + i)] = val
             for i, val in enumerate(r5.registers): raw_dict[str(i)] = val
             reading.raw_payload = json.dumps(raw_dict).encode('utf-8')
