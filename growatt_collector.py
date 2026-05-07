@@ -84,7 +84,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
             reading.grid_freq = parse_u16(reg2[12]) / 100.0
             
-            reading.load_p = parse_u32(reg2[18], reg2[19]) / 10.0
+            reading.load_p = parse_u32(reg2[17], reg2[18]) / 10.0
             
             reading.eps_p = parse_u32(reg4[0], reg4[1]) / 10.0
             reading.meter_total_w = parse_s32(reg4[1], reg4[2]) / 10.0
