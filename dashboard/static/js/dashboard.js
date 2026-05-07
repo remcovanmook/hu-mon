@@ -103,6 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
         { label: 'Battery Power (W)', color: COLORS.load }
     ]);
 
+    const tickClock = () => {
+        const el = document.getElementById("header-time");
+        if(el) el.innerText = new Date().toLocaleTimeString();
+    };
+    tickClock();
+    setInterval(tickClock, 1000);
+
     loadHistory();
     connectSSE();
     
