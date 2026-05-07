@@ -98,7 +98,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 client.connect()
 
             # Segment 1 (PV/Status) 3000-3024
-            r1 = client.read_input_registers(3000, count=25, device_id=1)
+            r1 = client.read_input_registers(3000, count=30, device_id=1)
             if r1.isError(): raise ModbusIOException("Failed to read Segment 1 (3000)")
             time.sleep(0.05)
             
@@ -144,14 +144,28 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_l2_a = parse_u16(reg2[5]) / 10.0
             
             v_l1 = parse_u16(reg2[0])
+            v_l2 = parse_u16(reg2[4])
             v_3038 = parse_u16(reg2[8])
             
             ratio = v_3038 / v_l1 if v_l1 > 0 else 0
             
             if 1.6 < ratio < 1.85:
-                # Frankenstein Profile
-                reading.grid_l3_v = parse_u16(reg2[18]) / 10.0 # 3048
-                reading.grid_l3_a = parse_u16(reg2[19]) / 10.0 # 3049
+                # Frankenstein Profile: L3 V/A are physically missing from the Modbus map.
+                # 3048/3049 are part of 32-bit energy counters (Eac Today).
+                # We must approximate L3 metrics to keep the dashboard topology intact.
+                
+                # Approximate L3 Voltage as average of L1 and L2
+                reading.grid_l3_v = ((v_l1 + v_l2) / 2.0) / 10.0
+                
+                # Derive L3 Current from the power balance
+                # Total AC Power (Pac) is at 3024
+                # L1 Power is 3033, L2 Power is 3037
+                total_ac_p = parse_u32(reg1[24], reg1[25]) / 10.0
+                l1_p = parse_u32(reg2[2], reg2[3]) / 10.0
+                l2_p = parse_u32(reg2[6], reg2[7]) / 10.0
+                
+                l3_p = max(0, total_ac_p - l1_p - l2_p)
+                reading.grid_l3_a = (l3_p / reading.grid_l3_v) if reading.grid_l3_v > 0 else 0.0
             else:
                 # Standard Profile
                 reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
