@@ -222,14 +222,70 @@
 
     <!-- ══ Tab 2: PV Power ══════════════════════════════════════════════ -->
     <div id="tab-pv" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-pv" hidden>
-      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-pv"></canvas></div></div>
-      <div class="cards-row cards-row--four" id="pv-string-cards"></div>
+      
+      <section class="section" aria-labelledby="pv-power-heading">
+        <h2 id="pv-power-heading" class="section-title">PV Power</h2>
+        <div class="chart-card" id="pv-power-display">
+          <div class="power-card-header">
+            <div class="power-card-headline">
+              <span class="power-direction">PV Array Power</span>
+              <span class="power-value mono" id="sum-pv-val">—</span>
+              <span class="power-unit">W</span>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="chart-pv" aria-label="PV array power history"></canvas></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="pv-voltage-heading">
+        <h2 id="pv-voltage-heading" class="section-title">Voltage</h2>
+        <div class="cards-row cards-row--four" id="pv-v-cards"></div>
+      </section>
+
+      <section class="section" aria-labelledby="pv-current-heading">
+        <h2 id="pv-current-heading" class="section-title">Current</h2>
+        <div class="cards-row cards-row--four" id="pv-a-cards"></div>
+      </section>
+
+      <section class="section" aria-labelledby="pv-power-sub-heading">
+        <h2 id="pv-power-sub-heading" class="section-title">Power</h2>
+        <div class="cards-row cards-row--four" id="pv-w-cards"></div>
+      </section>
+
     </div><!-- /#tab-pv -->
 
     <!-- ══ Tab 3: Grid Power ════════════════════════════════════════════ -->
     <div id="tab-grid" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-grid" hidden>
-      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-grid"></canvas></div></div>
-      <div class="cards-row cards-row--three" id="grid-phase-cards"></div>
+      
+      <section class="section" aria-labelledby="grid-power-heading">
+        <h2 id="grid-power-heading" class="section-title">Grid Power</h2>
+        <div class="chart-card" id="grid-power-display">
+          <div class="power-card-header">
+            <div class="power-card-headline">
+              <span class="power-direction">Grid Phase Power</span>
+              <span class="power-value mono" id="sum-grid-val">—</span>
+              <span class="power-unit">W</span>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="chart-grid" aria-label="Grid power history"></canvas></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="grid-voltage-heading">
+        <h2 id="grid-voltage-heading" class="section-title">Voltage</h2>
+        <div class="cards-row cards-row--three" id="grid-v-cards"></div>
+      </section>
+
+      <section class="section" aria-labelledby="grid-current-heading">
+        <h2 id="grid-current-heading" class="section-title">Current</h2>
+        <div class="cards-row cards-row--three" id="grid-a-cards"></div>
+      </section>
+
+      <section class="section" aria-labelledby="grid-power-sub-heading">
+        <h2 id="grid-power-sub-heading" class="section-title">Power</h2>
+        <div class="cards-row cards-row--three" id="grid-w-cards"></div>
+      </section>
+
     </div><!-- /#tab-grid -->
 
     <!-- ══ Tab 4: Battery Power ══════════════════════════════════════════ -->

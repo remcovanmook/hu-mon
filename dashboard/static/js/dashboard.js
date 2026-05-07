@@ -87,50 +87,51 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleBtn.textContent = THEME_LABELS[savedTheme] ?? savedTheme;
     }
     
-    // Auto-create DOM cards for phase arrays
-    const pvEl = document.getElementById('pv-string-cards');
-    if (pvEl) {
-        for(let i=1; i<=4; i++) {
-            pvEl.innerHTML += `
-            <article class="card">
-              <div class="card-label" style="border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">PV String ${i}</div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Voltage</span>
-                <span style="font-weight: 500;" id="pv${i}-v">— V</span>
+    // Auto-create DOM cards for phase arrays matching HEGG template
+    const createGroup = (id, label, unit, count, l_prefix) => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        
+        let html = '';
+        for(let i=1; i<=count; i++) {
+            const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
+            const valueId = `${l_prefix.toLowerCase()}${i}-${label.toLowerCase()[0]}`; // e.g. pv1-v, pv1-a
+            
+            html += `
+            <article class="card card--phase card--with-chart">
+              <div class="phase-row">
+                <div class="phase-badge">${l_prefix}${i}</div>
+                <div class="phase-value-group">
+                  <div class="card-value" id="${valueId}">—</div>
+                  <div class="card-unit">${unit}</div>
+                </div>
               </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Current</span>
-                <span style="font-weight: 500;" id="pv${i}-a">— A</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Power</span>
-                <span style="font-weight: 600; color: var(--pv${i}-color, var(--pv1));" id="pv${i}-w">— W</span>
-              </div>
-            </article>`;
-        }
-    }
-    
-    const gridEl = document.getElementById('grid-phase-cards');
-    if (gridEl) {
-        for(let i=1; i<=3; i++) {
-            gridEl.innerHTML += `
-            <article class="card">
-              <div class="card-label" style="border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">Grid Phase L${i}</div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Voltage</span>
-                <span style="font-weight: 500;" id="grid${i}-v">— V</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Current</span>
-                <span style="font-weight: 500;" id="grid${i}-a">— A</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
-                <span style="color: var(--text-muted); font-size: 0.9rem;">Power</span>
-                <span style="font-weight: 600; color: var(--phase-l${i}, var(--l1));" id="grid${i}-w">— W</span>
+              <div class="chart-wrapper chart-wrapper--inline">
+                <canvas id="${chartId}" aria-label="${l_prefix}${i} ${label} history"></canvas>
               </div>
             </article>`;
         }
-    }
+        el.innerHTML = html;
+        
+        // Initialize sparkline charts
+        for(let i=1; i<=count; i++) {
+            const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
+            const colorMap = {
+                'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
+                'Grid': [COLORS.l1, COLORS.l2, COLORS.l3]
+            };
+            const color = colorMap[l_prefix][i-1] || COLORS.pv1;
+            
+            charts[chartId] = createChart(chartId, [{ label: `${l_prefix}${i} ${label}`, color: color }]);
+        }
+    };
+
+    createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
+    createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
+    createGroup('pv-w-cards', 'Power', 'W', 4, 'PV');
+    createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
+    createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
+    createGroup('grid-w-cards', 'Power', 'W', 3, 'Grid');
 
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
@@ -229,18 +230,33 @@ async function loadHistory() {
         const labels = [];
         const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[]], battery: [[]] };
         
+        // Initialize arrays for sparklines
+        for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-a-pv${i}`] = [[]]; ds[`chart-w-pv${i}`] = [[]]; }
+        for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-a-grid${i}`] = [[]]; ds[`chart-w-grid${i}`] = [[]]; }
+
         data.forEach(d => {
             labels.push(d.ts);
             ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
             ds.pv[0].push(d.pv1_w_mean); ds.pv[1].push(d.pv2_w_mean); ds.pv[2].push(d.pv3_w_mean); ds.pv[3].push(d.pv4_w_mean);
             ds.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
             ds.battery[0].push(d.bat_p_mean);
+            
+            for(let i=1; i<=4; i++) {
+                ds[`chart-v-pv${i}`][0].push(d[`pv${i}_v_mean`]);
+                ds[`chart-a-pv${i}`][0].push(d[`pv${i}_a_mean`]);
+                ds[`chart-w-pv${i}`][0].push(d[`pv${i}_w_mean`]);
+            }
+            for(let i=1; i<=3; i++) {
+                ds[`chart-v-grid${i}`][0].push(d[`grid_l${i}_v_mean`]);
+                ds[`chart-a-grid${i}`][0].push(d[`grid_l${i}_a_mean`]);
+                ds[`chart-w-grid${i}`][0].push(Math.abs(d[`meter_l${i}_w_mean`]));
+            }
         });
         
         Object.keys(charts).forEach(k => {
-            if(!charts[k]) return;
+            if(!charts[k] || !ds[k]) return;
             charts[k].data.labels = [...labels];
-            charts[k].data.datasets.forEach((c, i) => c.data = [...ds[k][i]]);
+            charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
             charts[k].update('none');
         });
     } catch(e) {}
@@ -307,11 +323,19 @@ function connectSSE() {
             updateDOM(`pv${i}-v`, (d[`pv${i}_v`] || 0).toFixed(1));
             updateDOM(`pv${i}-a`, (d[`pv${i}_a`] || 0).toFixed(1));
             updateDOM(`pv${i}-w`, (d[`pv${i}_w`] || 0).toFixed(0));
+            
+            pushChart(charts[`chart-v-pv${i}`], ts, [d[`pv${i}_v`] || 0]);
+            pushChart(charts[`chart-a-pv${i}`], ts, [d[`pv${i}_a`] || 0]);
+            pushChart(charts[`chart-w-pv${i}`], ts, [d[`pv${i}_w`] || 0]);
         }
         for (let i = 1; i <= 3; i++) {
             updateDOM(`grid${i}-v`, (d[`grid_l${i}_v`] || 0).toFixed(1));
             updateDOM(`grid${i}-a`, (d[`grid_l${i}_a`] || 0).toFixed(1));
             updateDOM(`grid${i}-w`, Math.abs(d[`meter_l${i}_w`] || 0).toFixed(0));
+            
+            pushChart(charts[`chart-v-grid${i}`], ts, [d[`grid_l${i}_v`] || 0]);
+            pushChart(charts[`chart-a-grid${i}`], ts, [d[`grid_l${i}_a`] || 0]);
+            pushChart(charts[`chart-w-grid${i}`], ts, [Math.abs(d[`meter_l${i}_w`] || 0)]);
         }
         
         const sl = document.getElementById("status-label");
