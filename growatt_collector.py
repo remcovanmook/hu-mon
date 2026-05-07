@@ -35,7 +35,6 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
     inverter_model = "Unknown"
     inverter_serial = "Unknown"
     inverter_firmware = "Unknown"
-    datalogger_serial = "ZGQ0F6K041"
     inverter_rated_power_w = 0
 
     while bat_nominal_kwh is None:
@@ -84,7 +83,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                         inverter_model = f"{series_prefix} {power_watts}W"
                     inverter_rated_power_w = power_watts * 10 if power_watts < 1000 else power_watts
                 
-                logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware} DL: {datalogger_serial}")
+                logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware}")
                 break
 
         except Exception as e:
@@ -173,17 +172,12 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
             reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
             
-            # Since official firmware does not inject datalogger data, we hardcode the mapping
-            reading.datalogger_model = "ShineWiLan-X2"
-            reading.signal_quality = 0 # 0 triggers UI handling
-            
             # Mathematically derive instantaneous load (safest and most accurate)
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
             reading.bat_nominal_kwh = bat_nominal_kwh
             reading.inverter_model = inverter_model
             reading.inverter_serial = inverter_serial
             reading.inverter_firmware = inverter_firmware
-            reading.datalogger_serial = datalogger_serial
             reading.rated_power_w = inverter_rated_power_w
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy

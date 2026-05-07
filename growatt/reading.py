@@ -59,9 +59,6 @@ class GrowattReading:
     inverter_model: str = ""
     inverter_serial: str = ""
     inverter_firmware: str = ""
-    datalogger_model: str = ""
-    datalogger_serial: str = ""
-    signal_quality: int = 0
     rated_power_w: int = 0
 
     
