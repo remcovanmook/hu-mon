@@ -143,17 +143,26 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_l2_v = parse_u16(reg2[4]) / 10.0
             reading.grid_l2_a = parse_u16(reg2[5]) / 10.0
             
-            # Autodetect Standard vs Frankenstein MOD-HU Protocol II map
             v_l1 = parse_u16(reg2[0])
+            v_l2 = parse_u16(reg2[4])
             v_3038 = parse_u16(reg2[8])
-            v_3048 = parse_u16(reg2[18])
             
             ratio = v_3038 / v_l1 if v_l1 > 0 else 0
             
-            if 1.6 < ratio < 1.85 and 1800 < v_3048 < 2700:
-                # Frankenstein Profile: L3 displaced by Delta voltages
-                reading.grid_l3_v = parse_u16(reg2[18]) / 10.0 # 3048
-                reading.grid_l3_a = parse_u16(reg2[17]) / 10.0 # 3047 (Current is sitting before Voltage here)
+            if 1.6 < ratio < 1.85:
+                # Frankenstein Profile: L3 displaced by Delta voltages and missing from standard block.
+                # Approximate L3 Voltage as average of L1 and L2
+                reading.grid_l3_v = ((v_l1 + v_l2) / 2.0) / 10.0
+                
+                # Derive L3 Current from the power balance
+                # Assuming AC Power ~ PV Total Power (as seen in logs when battery/load are 0)
+                # or derive from apparent power. L3_P = Total_P - L1_P - L2_P
+                pv_p = parse_u32(reg1[1], reg1[2]) / 10.0
+                l1_p = parse_u32(reg2[2], reg2[3]) / 10.0
+                l2_p = parse_u32(reg2[6], reg2[7]) / 10.0
+                
+                l3_p = max(0, pv_p - l1_p - l2_p)
+                reading.grid_l3_a = (l3_p / reading.grid_l3_v) if reading.grid_l3_v > 0 else 0.0
             else:
                 # Standard Profile
                 reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
