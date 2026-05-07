@@ -45,6 +45,12 @@ class GrowattReading:
     bat_nominal_kwh: float = 0.0  # Nominal battery capacity
     load_p: float = 0.0
     eps_p: float = 0.0
+    eps_l1_v: float = 0.0
+    eps_l1_a: float = 0.0
+    eps_l2_v: float = 0.0
+    eps_l2_a: float = 0.0
+    eps_l3_v: float = 0.0
+    eps_l3_a: float = 0.0
     
     # Energy Counters
     pv_today_kwh: float = 0.0

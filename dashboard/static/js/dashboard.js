@@ -70,7 +70,9 @@ const extremes = {
     pv_v: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
     pv_c: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
     grid_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
-    grid_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity}))
+    grid_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
+    eps_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
+    eps_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity}))
 };
 let statusAnnotations = {};
 let lastStatus = null;
@@ -164,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("tab-btn-overview").addEventListener("click", () => switchTab("overview"));
     document.getElementById("tab-btn-pv").addEventListener("click", () => switchTab("pv"));
     document.getElementById("tab-btn-grid").addEventListener("click", () => switchTab("grid"));
-    document.getElementById("tab-btn-battery").addEventListener("click", () => switchTab("battery"));
+    document.getElementById("tab-btn-eps").addEventListener("click", () => switchTab("eps"));
 
 
     
@@ -180,7 +182,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         // Clear extremes
         for(let i=0; i<4; i++) { extremes.pv_v[i] = {min: Infinity, max: -Infinity}; extremes.pv_c[i] = {min: Infinity, max: -Infinity}; }
-        for(let i=0; i<3; i++) { extremes.grid_v[i] = {min: Infinity, max: -Infinity}; extremes.grid_c[i] = {min: Infinity, max: -Infinity}; }
+        for(let i=0; i<3; i++) { extremes.grid_v[i] = {min: Infinity, max: -Infinity}; extremes.grid_c[i] = {min: Infinity, max: -Infinity};
+            extremes.eps_v[i] = {min: Infinity, max: -Infinity};
+            extremes.eps_c[i] = {min: Infinity, max: -Infinity}; }
         statusAnnotations = {};
         lastStatus = null;
         
@@ -232,6 +236,8 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
+    createGroup('eps-v-cards', 'Voltage', 'V', 3, 'eps');
+    createGroup('eps-a-cards', 'Current', 'A', 3, 'eps');
 
     charts.overview = createChart('chart-power', [
         { label: 'PV (W)', color: COLORS.pv1 },
@@ -259,9 +265,19 @@ document.addEventListener("DOMContentLoaded", () => {
         charts.grid.data.datasets[i].stack = 'phases';
         charts.grid.data.datasets[i].fill = true;
     }
-    charts.battery = createChart('chart-battery', [
-        { label: 'Battery (W)', color: COLORS.returned }
+    charts.eps = createChart('chart-eps', [
+        { label: 'EPS Total', color: COLORS.net },
+        { label: 'L1', color: COLORS.l1 },
+        { label: 'L2', color: COLORS.l2 },
+        { label: 'L3', color: COLORS.l3 }
     ]);
+    charts.eps.options.scales.y.stacked = true;
+    charts.eps.data.datasets[0].stack = 'net';
+    charts.eps.data.datasets[0].borderWidth = 3;
+    for(let i=1; i<=3; i++) {
+        charts.eps.data.datasets[i].stack = 'phases';
+        charts.eps.data.datasets[i].fill = true;
+    }
 
     const tickClock = () => {
         const el = document.getElementById("header-time");
@@ -346,7 +362,7 @@ async function loadHistory(hours = 24) {
         if(data.length === 0) return;
         
         const labels = [];
-        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], battery: [[]] };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]] };
         
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
@@ -368,7 +384,7 @@ async function loadHistory(hours = 24) {
             ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.eps_p_mean));
             ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
-            ds.battery[0].push(Math.round(d.bat_p_mean));
+            ds.eps[0].push(Math.round(d.eps_p_mean)); ds.eps[1].push(Math.round(d.eps_l1_v_mean * d.eps_l1_a_mean)); ds.eps[2].push(Math.round(d.eps_l2_v_mean * d.eps_l2_a_mean)); ds.eps[3].push(Math.round(d.eps_l3_v_mean * d.eps_l3_a_mean));
             
             for(let i=1; i<=4; i++) {
                 let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
@@ -385,6 +401,16 @@ async function loadHistory(hours = 24) {
                 if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
                 if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
                 if(c > extremes.grid_c[i-1].max) extremes.grid_c[i-1].max = c;
+            let ev = d[`eps_l${i}_v`] || 0, ec = d[`eps_l${i}_a`] || 0;
+            if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
+            if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
+            if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
+            if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
+                let ev = d[`eps_l${i}_v_mean`], ec = d[`eps_l${i}_a_mean`];
+                if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
+                if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
+                if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
+                if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
             }
         });
         
@@ -409,6 +435,14 @@ async function loadHistory(hours = 24) {
         syncChartScales(pvCCharts, extremes.pv_c, 0);
         syncChartScales(gridVCharts, extremes.grid_v, 0);
         syncChartScales(gridCCharts, extremes.grid_c, 0);
+        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
+        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
+        syncChartScales(epsVCharts, extremes.eps_v, 0);
+        syncChartScales(epsCCharts, extremes.eps_c, 0);
+        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
+        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
+        syncChartScales(epsVCharts, extremes.eps_v, 0);
+        syncChartScales(epsCCharts, extremes.eps_c, 0);
 
         for(let i=1; i<=4; i++) {
             updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
@@ -417,6 +451,8 @@ async function loadHistory(hours = 24) {
         for(let i=1; i<=3; i++) {
             updateSparklineAnnotations(charts[`chart-v-grid${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-grid${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
@@ -522,6 +558,16 @@ function connectSSE() {
             if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
             if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
             if(c > extremes.grid_c[i-1].max) extremes.grid_c[i-1].max = c;
+            let ev = d[`eps_l${i}_v`] || 0, ec = d[`eps_l${i}_a`] || 0;
+            if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
+            if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
+            if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
+            if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
+                let ev = d[`eps_l${i}_v_mean`], ec = d[`eps_l${i}_a_mean`];
+                if(ev < extremes.eps_v[i-1].min) extremes.eps_v[i-1].min = ev;
+                if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
+                if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
+                if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
         }
         
         // Live Sync
@@ -533,6 +579,14 @@ function connectSSE() {
         syncChartScales(pvCCharts, extremes.pv_c, 0);
         syncChartScales(gridVCharts, extremes.grid_v, 0);
         syncChartScales(gridCCharts, extremes.grid_c, 0);
+        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
+        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
+        syncChartScales(epsVCharts, extremes.eps_v, 0);
+        syncChartScales(epsCCharts, extremes.eps_c, 0);
+        const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
+        const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
+        syncChartScales(epsVCharts, extremes.eps_v, 0);
+        syncChartScales(epsCCharts, extremes.eps_c, 0);
         
         for(let i=1; i<=4; i++) {
             updateSparklineAnnotations(charts[`chart-v-pv${i}`], extremes.pv_v[i-1].min, extremes.pv_v[i-1].max, COLORS[`pv${i}`]);
@@ -541,6 +595,8 @@ function connectSSE() {
         for(let i=1; i<=3; i++) {
             updateSparklineAnnotations(charts[`chart-v-l${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-l${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
@@ -615,14 +671,22 @@ function connectSSE() {
         updateDOM(`l2-w`, g2w.toFixed(0));
         updateDOM(`l3-w`, g3w.toFixed(0));
 
-        updateDOM("bat-v", d.bat_v.toFixed(1));
-        updateDOM("bat-a", d.bat_i.toFixed(1));
-        updateDOM("bat-w", d.bat_p.toFixed(0));
+        
+        
+        
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
         pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.eps_p)]);
         pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w), Math.round(d.pv4_w)]);
         pushChart(charts.grid, ts, [Math.round(-d.meter_total_w), Math.round(g1w), Math.round(g2w), Math.round(g3w)]);
-        pushChart(charts.battery, ts, [Math.round(d.bat_p)]);
+        const e1w = (d.eps_l1_v || 0) * (d.eps_l1_a || 0);
+        const e2w = (d.eps_l2_v || 0) * (d.eps_l2_a || 0);
+        const e3w = (d.eps_l3_v || 0) * (d.eps_l3_a || 0);
+        for(let i=1; i<=3; i++) {
+            updateDOM(`eps${i}-v`, (d[`eps_l${i}_v`] || 0).toFixed(1));
+            updateDOM(`eps${i}-a`, (d[`eps_l${i}_a`] || 0).toFixed(1));
+        }
+        updateDOM("sum-eps-val", Math.abs(d.eps_p).toFixed(0));
+        pushChart(charts.eps, ts, [Math.round(d.eps_p), Math.round(e1w), Math.round(e2w), Math.round(e3w)]);
     });
 }

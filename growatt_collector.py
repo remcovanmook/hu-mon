@@ -107,8 +107,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r2.isError(): raise ModbusIOException("Failed to read Segment 2 (3030)")
             time.sleep(0.05)
 
-            # Segment 4 (Meter/EPS) 3120-3159
-            r4 = client.read_input_registers(3120, count=40, device_id=1)
+            # Segment 4 (Meter/EPS) 3115-3154
+            r4 = client.read_input_registers(3115, count=40, device_id=1)
             
             # Segment 5 (Low Block Mirror Hunt) 0-124
             r5 = client.read_input_registers(0, count=125, device_id=1)
@@ -165,13 +165,25 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
                 reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
             
-
+            # Segment 4 contains EPS and Meter. Starts at 3115.
+            reg4 = r4.registers if len(r4.registers) >= 40 else [0]*40
             
-            reading.eps_p = parse_u32(reg4[0], reg4[1]) / 10.0
-            reading.meter_total_w = parse_s32(reg4[1], reg4[2]) / 10.0
-            reading.meter_l1_w = parse_s32(reg4[3], reg4[4]) / 10.0
-            reading.meter_l2_w = parse_s32(reg4[5], reg4[6]) / 10.0
-            reading.meter_l3_w = parse_s32(reg4[7], reg4[8]) / 10.0
+            # 3118 is reg4[3]
+            reading.eps_l1_v = parse_u16(reg4[3]) / 10.0
+            
+            # 3120 is reg4[5]
+            reading.eps_p = parse_u32(reg4[5], reg4[6]) / 10.0
+            reading.meter_total_w = parse_s32(reg4[6], reg4[7]) / 10.0
+            
+            # 3130 is reg4[15]
+            reading.eps_l2_v = parse_u16(reg4[15]) / 10.0
+            reading.eps_l1_a = parse_u16(reg4[16]) / 10.0  # 3131
+            reading.eps_l3_v = parse_u16(reg4[17]) / 10.0  # 3132
+            reading.eps_l2_a = parse_u16(reg4[18]) / 10.0  # 3133
+            reading.eps_l3_a = parse_u16(reg4[20]) / 10.0  # 3135
+            reading.meter_l1_w = parse_s32(reg4[8], reg4[9]) / 10.0
+            reading.meter_l2_w = parse_s32(reg4[10], reg4[11]) / 10.0
+            reading.meter_l3_w = parse_s32(reg4[12], reg4[13]) / 10.0
             
             reading.bat_soc = parse_u16(reg3[0])
             reading.bat_v = parse_u16(reg3[1]) / 10.0

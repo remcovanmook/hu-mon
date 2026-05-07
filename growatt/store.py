@@ -64,7 +64,7 @@ INSERT INTO {table} (
     grid_l3_v_mean, grid_l3_a_mean,
     grid_freq_mean, meter_total_w_mean,
     bat_soc_mean, bat_v_mean, bat_i_mean, bat_p_mean,
-    load_p_mean, eps_p_mean, status_code
+    load_p_mean, eps_p_mean, eps_l1_v_mean, eps_l1_a_mean, eps_l2_v_mean, eps_l2_a_mean, eps_l3_v_mean, eps_l3_a_mean, status_code
 ) VALUES (
     ?, ?, 1, ?, 
     ?, ?, ?, 
@@ -76,7 +76,7 @@ INSERT INTO {table} (
     ?, ?, 
     ?, ?, 
     ?, ?, ?, ?, 
-    ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?
 ) ON CONFLICT(ts, serial) DO UPDATE SET
     n = n + 1,
     pv_total_w_mean = (pv_total_w_mean * n + excluded.pv_total_w_mean) / (n + 1),
@@ -106,6 +106,12 @@ INSERT INTO {table} (
     bat_p_mean = (bat_p_mean * n + excluded.bat_p_mean) / (n + 1),
     load_p_mean = (load_p_mean * n + excluded.load_p_mean) / (n + 1),
     eps_p_mean = (eps_p_mean * n + excluded.eps_p_mean) / (n + 1),
+    eps_l1_v_mean = (eps_l1_v_mean * n + excluded.eps_l1_v_mean) / (n + 1),
+    eps_l1_a_mean = (eps_l1_a_mean * n + excluded.eps_l1_a_mean) / (n + 1),
+    eps_l2_v_mean = (eps_l2_v_mean * n + excluded.eps_l2_v_mean) / (n + 1),
+    eps_l2_a_mean = (eps_l2_a_mean * n + excluded.eps_l2_a_mean) / (n + 1),
+    eps_l3_v_mean = (eps_l3_v_mean * n + excluded.eps_l3_v_mean) / (n + 1),
+    eps_l3_a_mean = (eps_l3_a_mean * n + excluded.eps_l3_a_mean) / (n + 1),
     status_code = excluded.status_code;
 """
 
@@ -146,7 +152,11 @@ class GrowattStore:
             r.grid_l3_v, r.grid_l3_a,
             r.grid_freq, r.meter_total_w,
             r.bat_soc, r.bat_v, r.bat_i, r.bat_p,
-            r.load_p, r.eps_p, r.status_code
+            r.load_p, r.eps_p, 
+            r.eps_l1_v, r.eps_l1_a, 
+            r.eps_l2_v, r.eps_l2_a, 
+            r.eps_l3_v, r.eps_l3_a, 
+            r.status_code
         )
 
     def insert(self, r: GrowattReading):

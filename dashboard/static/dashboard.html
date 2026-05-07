@@ -126,7 +126,7 @@
       <button class="tab-btn tab-btn--active" id="tab-btn-overview" role="tab" aria-selected="true" aria-controls="tab-overview">Overview</button>
       <button class="tab-btn" id="tab-btn-pv" role="tab" aria-selected="false" aria-controls="tab-pv">PV Power</button>
       <button class="tab-btn" id="tab-btn-grid" role="tab" aria-selected="false" aria-controls="tab-grid">Grid Power</button>
-      <button class="tab-btn" id="tab-btn-battery" role="tab" aria-selected="false" aria-controls="tab-battery">Battery Power</button>
+      <button class="tab-btn" id="tab-btn-eps" role="tab" aria-selected="false" aria-controls="tab-eps">EPS Power</button>
     </nav>
 
         <!-- ══ Tab 1: Overview ══════════════════════════════════════════════ -->
@@ -278,16 +278,34 @@
 
     </div><!-- /#tab-grid -->
 
-    <!-- ══ Tab 4: Battery Power ══════════════════════════════════════════ -->
-    <div id="tab-battery" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-battery" hidden>
-      <div class="chart-card" style="margin-bottom:2rem;"><div class="chart-wrapper"><canvas id="chart-battery"></canvas></div></div>
-      <div class="cards-row cards-row--four">
-        <article class="card"><div class="card-label">Battery Voltage</div><div class="card-value" id="bat-v">— V</div></article>
-        <article class="card"><div class="card-label">Battery Current</div><div class="card-value" id="bat-a">— A</div></article>
-        <article class="card"><div class="card-label">Battery Power</div><div class="card-value" id="bat-w">— W</div></article>
-        <article class="card"><div class="card-label">Battery SOC</div><div class="card-value" id="bat-soc2">— %</div></article>
-      </div>
-    </div><!-- /#tab-battery -->
+    <!-- ══ Tab 4: EPS Power ══════════════════════════════════════════ -->
+    <div id="tab-eps" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-eps" hidden>
+      
+      <section class="section" aria-labelledby="eps-power-heading">
+        <h2 id="eps-power-heading" class="section-title">EPS Power</h2>
+        <div class="chart-card" id="eps-power-display">
+          <div class="power-card-header">
+            <div class="power-card-headline">
+              <span class="power-direction">EPS Phase Power</span>
+              <span class="power-value mono" id="sum-eps-val">—</span>
+              <span class="power-unit">W</span>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="chart-eps" aria-label="EPS power history"></canvas></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="eps-voltage-heading">
+        <h2 id="eps-voltage-heading" class="section-title">Voltage</h2>
+        <div class="cards-row cards-row--three" id="eps-v-cards"></div>
+      </section>
+
+      <section class="section" aria-labelledby="eps-current-heading">
+        <h2 id="eps-current-heading" class="section-title">Current</h2>
+        <div class="cards-row cards-row--three" id="eps-a-cards"></div>
+      </section>
+
+    </div><!-- /#tab-eps -->
 </main>
 
   <footer class="footer"></footer>
