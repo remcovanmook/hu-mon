@@ -259,17 +259,21 @@ function connectSSE() {
         if(lInvGrid) {
             lInvGrid.classList.toggle("active", Math.abs(d.meter_total_w) > 10);
             if (d.meter_total_w > 0) {
-                lInvGrid.classList.add("export"); // Reverse animation
+                lInvGrid.classList.add("export"); // Forward
+                lInvGrid.classList.remove("import");
             } else {
+                lInvGrid.classList.add("import"); // Reverse
                 lInvGrid.classList.remove("export");
             }
         }
         if(lInvBat) {
             lInvBat.classList.toggle("active", Math.abs(d.bat_p) > 10);
-            if (d.bat_p < 0) {
-                lInvBat.classList.add("export"); // Discharging is toward inverter
+            if (d.bat_p > 0) {
+                lInvBat.classList.add("charging"); // Forward (Inverter -> Bat)
+                lInvBat.classList.remove("discharging");
             } else {
-                lInvBat.classList.remove("export");
+                lInvBat.classList.add("discharging"); // Reverse (Bat -> Inverter)
+                lInvBat.classList.remove("charging");
             }
         }
         if(lInvLoad) {

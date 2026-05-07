@@ -1148,7 +1148,11 @@ html, body {
 .flow-line.active {
   stroke: var(--primary); opacity: 0.8; animation: flowDash 1s linear infinite;
 }
-.flow-line.export { stroke: #f59e0b; animation-direction: reverse; }
+.flow-line.export { stroke: var(--returned-color); }
+.flow-line.import { stroke: var(--delivered-color); animation-direction: reverse; }
+.flow-line.charging { stroke: var(--delivered-color); }
+.flow-line.discharging { stroke: var(--returned-color); animation-direction: reverse; }
+
 @keyframes flowDash {
   to { stroke-dashoffset: -16; }
 }
