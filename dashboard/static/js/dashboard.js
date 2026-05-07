@@ -338,7 +338,7 @@ async function loadHistory(hours = 24) {
         
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
-        for(let i=1; i<=3; i++) { ds[`chart-v-grid${i}`] = [[]]; ds[`chart-c-grid${i}`] = [[]]; }
+        for(let i=1; i<=3; i++) { ds[`chart-v-l${i}`] = [[]]; ds[`chart-c-l${i}`] = [[]]; }
 
         let firstTs = null;
         let lastTs = null;
@@ -368,7 +368,7 @@ async function loadHistory(hours = 24) {
             }
             for(let i=1; i<=3; i++) {
                 let v = d[`grid_l${i}_v_mean`], c = d[`grid_l${i}_a_mean`];
-                ds[`chart-v-grid${i}`][0].push(v); ds[`chart-c-grid${i}`][0].push(c);
+                ds[`chart-v-l${i}`][0].push(v); ds[`chart-c-l${i}`][0].push(c);
                 if(v < extremes.grid_v[i-1].min) extremes.grid_v[i-1].min = v;
                 if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
                 if(c < extremes.grid_c[i-1].min) extremes.grid_c[i-1].min = c;
@@ -501,10 +501,10 @@ function connectSSE() {
         }
         for (let i = 1; i <= 3; i++) {
             let v = d[`grid_l${i}_v`] || 0, c = d[`grid_l${i}_a`] || 0;
-            updateDOM(`grid${i}-c`, c.toFixed(1)); 
-            updateDOM(`grid${i}-v`, v.toFixed(1));
-            pushChart(charts[`chart-v-grid${i}`], ts, [v]);
-            pushChart(charts[`chart-c-grid${i}`], ts, [c]);
+            updateDOM(`l${i}-a`, c.toFixed(1)); 
+            updateDOM(`l${i}-v`, v.toFixed(1));
+            pushChart(charts[`chart-v-l${i}`], ts, [v]);
+            pushChart(charts[`chart-c-l${i}`], ts, [c]);
             
             if(v < extremes.grid_v[i-1].min) extremes.grid_v[i-1].min = v;
             if(v > extremes.grid_v[i-1].max) extremes.grid_v[i-1].max = v;
@@ -515,8 +515,8 @@ function connectSSE() {
         // Live Sync
         const pvVCharts = [1,2,3,4].map(i => charts[`chart-v-pv${i}`]);
         const pvCCharts = [1,2,3,4].map(i => charts[`chart-c-pv${i}`]);
-        const gridVCharts = [1,2,3].map(i => charts[`chart-v-grid${i}`]);
-        const gridCCharts = [1,2,3].map(i => charts[`chart-c-grid${i}`]);
+        const gridVCharts = [1,2,3].map(i => charts[`chart-v-l${i}`]);
+        const gridCCharts = [1,2,3].map(i => charts[`chart-c-l${i}`]);
         syncChartScales(pvVCharts, extremes.pv_v, 0);
         syncChartScales(pvCCharts, extremes.pv_c, 0);
         syncChartScales(gridVCharts, extremes.grid_v, 0);
@@ -527,8 +527,8 @@ function connectSSE() {
             updateSparklineAnnotations(charts[`chart-c-pv${i}`], extremes.pv_c[i-1].min, extremes.pv_c[i-1].max, COLORS[`pv${i}`]);
         }
         for(let i=1; i<=3; i++) {
-            updateSparklineAnnotations(charts[`chart-v-grid${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
-            updateSparklineAnnotations(charts[`chart-c-grid${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-l${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-c-l${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
         }
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
@@ -596,12 +596,12 @@ function connectSSE() {
         const g2w = d.grid_l2_v * d.grid_l2_a;
         const g3w = d.grid_l3_v * d.grid_l3_a;
         for(let i=1; i<=3; i++) {
-            updateDOM(`grid${i}-v`, d[`grid_l${i}_v`].toFixed(1));
-            updateDOM(`grid${i}-a`, d[`grid_l${i}_a`].toFixed(1));
+            updateDOM(`l${i}-v`, d[`grid_l${i}_v`].toFixed(1));
+            updateDOM(`l${i}-a`, d[`grid_l${i}_a`].toFixed(1));
         }
-        updateDOM(`grid1-w`, g1w.toFixed(0));
-        updateDOM(`grid2-w`, g2w.toFixed(0));
-        updateDOM(`grid3-w`, g3w.toFixed(0));
+        updateDOM(`l1-w`, g1w.toFixed(0));
+        updateDOM(`l2-w`, g2w.toFixed(0));
+        updateDOM(`l3-w`, g3w.toFixed(0));
 
         updateDOM("bat-v", d.bat_v.toFixed(1));
         updateDOM("bat-a", d.bat_i.toFixed(1));
