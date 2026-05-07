@@ -47,13 +47,15 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 time.sleep(2)
                 continue
 
-            # Also read metadata (9-58 = 50 registers)
+            # Read Legacy serial OR new serial, and read Firmware
             r_meta = client.read_holding_registers(9, count=50, device_id=1)
+            # Read Datalogger Serial (Holding 122)
+            r_log_ser = client.read_holding_registers(122, count=10, device_id=1)
             # Read New Serial Number from 3001 (15 Regs)
             r_serial = client.read_holding_registers(3001, count=15, device_id=1)
             
-            if not r_meta.isError() and not r_serial.isError():
-                regs = r_meta.registers
+            if not r_meta.isError() and not r_serial.isError() and not r_log_ser.isError():
+                regs_meta = r_meta.registers
                 regs_ser = r_serial.registers
                 
                 def decode_ascii(reg_list):
@@ -62,11 +64,11 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                         b.extend(r.to_bytes(2, 'big'))
                     return b.decode('ascii', 'ignore').replace('\x00', '').strip()
                 
-                inverter_firmware = decode_ascii(regs[0:6])     # 9-14
+                inverter_firmware = decode_ascii(regs_meta[0:6])     # 9-14
                 inverter_serial = decode_ascii(regs_ser)        # 3001-3015
                 
                 # Algorithmic Module ID decode (Reg 28-29 = index 19-20)
-                module_id = (regs[19] << 16) | regs[20]
+                module_id = (regs_meta[19] << 16) | regs_meta[20]
                 if module_id == 0:
                     # Fallback if Modbus proxy zeros it out
                     inverter_model = "MOD 12KTL3-HU"
@@ -80,7 +82,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                     else:
                         inverter_model = f"{series_prefix} {power_watts}W"
                 
-                logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware}")
+                datalogger_serial = decode_ascii(r_log_ser.registers)
+                logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware} DL: {datalogger_serial}")
+                break
 
         except Exception as e:
             logging.warning(f"Error reading config: {e}")
@@ -108,8 +112,10 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             
             # Segment 3 (Battery) 3170-3189
             r3 = client.read_input_registers(3170, count=20, device_id=1)
+            # Segment 5 (Datalogger Health) 3112-3122
+            r5 = client.read_input_registers(3112, count=11, device_id=1)
 
-            if r1.isError() or r2.isError() or r3.isError() or r4.isError():
+            if r1.isError() or r2.isError() or r3.isError() or r4.isError() or r5.isError():
                 time.sleep(1)
                 continue
                 
@@ -117,6 +123,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reg2 = r2.registers
             reg4 = r4.registers
             reg3 = r3.registers
+            reg5 = r5.registers
 
             reading = GrowattReading()
             reading.status_code = parse_u16(reg1[0])
@@ -168,12 +175,32 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.bat_discharge_today_kwh = parse_u32(reg3[6], reg3[7]) / 10.0
             reading.bat_charge_today_kwh = parse_u32(reg3[10], reg3[11]) / 10.0
             
+            # Datalogger logic
+            logger_type = reg5[8]
+            raw_signal = reg5[10]
+            if raw_signal > 100:
+                reading.signal_quality = raw_signal & 0x00FF
+            else:
+                reading.signal_quality = raw_signal
+                
+            if logger_type == 15:
+                reading.datalogger_model = "ShineWifi-X2"
+            elif logger_type == 10:
+                reading.datalogger_model = "ShineWifi-X"
+            elif logger_type == 11:
+                reading.datalogger_model = "ShineLan-X"
+            else:
+                # If bridging makes it 0, map it cleanly
+                reading.datalogger_model = f"Bridge ({logger_type})" if logger_type == 0 else f"Unknown ({logger_type})"
+                
+            
             # Mathematically derive instantaneous load (safest and most accurate)
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
             reading.bat_nominal_kwh = bat_nominal_kwh
             reading.inverter_model = inverter_model
             reading.inverter_serial = inverter_serial
             reading.inverter_firmware = inverter_firmware
+            reading.datalogger_serial = datalogger_serial
 
             # Package raw payload as a JSON dictionary for the Modbus Proxy
             raw_dict = {}

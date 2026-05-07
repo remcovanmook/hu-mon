@@ -266,6 +266,9 @@ function connectSSE() {
         updateDOM("meta-model", d.inverter_model);
         updateDOM("meta-serial", d.inverter_serial);
         updateDOM("meta-fw", d.inverter_firmware);
+        updateDOM("meta-logger", d.datalogger_model || "—");
+        updateDOM("meta-logger-ser", d.datalogger_serial || "—");
+        updateDOM("meta-signal", (d.signal_quality ? d.signal_quality + "%" : "—"));
         updateDOM("meta-e-today", d.pv_today_kwh.toFixed(1) + " kWh");
         updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
 
