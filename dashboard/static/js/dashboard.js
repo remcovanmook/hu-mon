@@ -262,11 +262,14 @@ function connectSSE() {
 
         
         
-        // Metadata
-        updateDOM("meta-model", d.inverter_model || "—");
-        updateDOM("meta-serial", d.inverter_serial || "—");
-        updateDOM("meta-fw", d.inverter_firmware || "—");
-        const statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+        // Update DOM metrics
+        updateDOM("meta-model", d.inverter_model);
+        updateDOM("meta-serial", d.inverter_serial);
+        updateDOM("meta-fw", d.inverter_firmware);
+        updateDOM("meta-e-today", d.epv_today_kwh.toFixed(1) + " kWh");
+        updateDOM("meta-e-total", d.epv_total_kwh.toFixed(1) + " kWh");
+
+        let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
         updateDOM("meta-status", statusStr);
         
         const sl = document.getElementById("status-label");

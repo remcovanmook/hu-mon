@@ -1117,7 +1117,7 @@ html, body {
 
 /* Cute Flow Diagram CSS */
 .power-flow {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 2rem; margin-bottom: 2rem; position: relative;
 }
 .flow-container {
@@ -1126,7 +1126,7 @@ html, body {
 .flow-node {
   position: absolute; display: flex; flex-direction: column; align-items: center;
   justify-content: center; width: 120px; height: 100px;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   z-index: 10; font-weight: 500; font-size: 0.9rem;
 }
 .flow-node .icon { font-size: 2rem; margin-bottom: 0.25rem; }
@@ -1134,7 +1134,7 @@ html, body {
 
 /* Positions */
 #node-pv { top: 20px; left: 0; }
-#node-inv { top: 20px; left: 340px; border-color: var(--primary); }
+#node-inv { top: 20px; left: 340px; border-color: var(--accent-blue); }
 #node-grid { top: 20px; left: 680px; }
 #node-bat { top: 180px; left: 160px; }
 #node-load { top: 180px; left: 520px; }
@@ -1143,10 +1143,10 @@ html, body {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;
 }
 .flow-line {
-  fill: none; stroke: var(--text-muted); stroke-width: 4; stroke-dasharray: 8; opacity: 0.3;
+  fill: none; stroke: var(--border); stroke-width: 4; stroke-dasharray: 8; opacity: 1.0;
 }
 .flow-line.active {
-  stroke: var(--primary); opacity: 0.8; animation: flowDash 1s linear infinite;
+  stroke: var(--accent-blue); opacity: 0.8; animation: flowDash 1s linear infinite;
 }
 .flow-line.export { stroke: var(--returned-color); }
 .flow-line.import { stroke: var(--delivered-color); animation-direction: reverse; }
