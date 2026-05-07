@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             const color = colorMap[l_prefix][i-1] || COLORS.pv1;
             
-            charts[chartId] = createChart(chartId, [{ label: `${l_prefix}${i} ${label}`, color: color }]);
+            charts[chartId] = createChart(chartId, [{ label: `${l_prefix}${i} ${label}`, color: color }], false);
         }
     };
 
@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
     recolorCharts();
 });
 
-function createChart(id, series) {
+function createChart(id, series, showLegend = true) {
     const el = document.getElementById(id);
     if(!el) return null;
     const ctx = el.getContext('2d');
@@ -185,7 +185,7 @@ function createChart(id, series) {
         interaction: { mode: "index", intersect: false },
         plugins: {
             legend: { 
-                display: true, 
+                display: showLegend, 
                 position: 'bottom',
                 labels: { usePointStyle: true, boxWidth: 8, padding: 20 }
             },
