@@ -196,17 +196,24 @@ function connectSSE() {
         
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
-        // sum-pv-today and sum-pv-total await backend registers
+        updateDOM("sum-pv-today", d.pv_today_kwh.toFixed(1));
+        updateDOM("sum-pv-total", d.pv_total_kwh.toFixed(0));
 
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
         updateDOM("sum-grid-stat", d.meter_total_w >= 0 ? "Exporting" : "Importing");
-        // sum-grid-today and sum-grid-total await backend registers
+        updateDOM("sum-grid-today", d.meter_total_w >= 0 ? d.grid_export_today_kwh.toFixed(1) : d.grid_import_today_kwh.toFixed(1));
+        // Hardcode "total ever" until we add it, or just show Export for now
+        updateDOM("sum-grid-total", d.grid_export_today_kwh.toFixed(0));
 
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        // sum-bat-kwh awaits capacity configuration
-        // sum-bat-autonomy awaits load-based math
+        // Assume standard 10kWh ARK battery capacity for calculation
+        const bat_kwh = (d.bat_soc / 100.0) * 10.0;
+        updateDOM("sum-bat-kwh", bat_kwh.toFixed(1));
+        const autonomy = d.load_p > 0 ? (bat_kwh * 1000 / d.load_p).toFixed(1) : "—";
+        updateDOM("sum-bat-autonomy", autonomy);
         
         updateDOM("sum-load", d.load_p.toFixed(0));
+        updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
         
         // Per-phase estimation (assuming balanced until we pull smart meter registers)
         const est_l1 = (d.load_p / 3).toFixed(0);

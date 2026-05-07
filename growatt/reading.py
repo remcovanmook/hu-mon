@@ -42,6 +42,14 @@ class GrowattReading:
     load_p: float = 0.0
     eps_p: float = 0.0
     
+    # Energy Counters
+    pv_today_kwh: float = 0.0
+    pv_total_kwh: float = 0.0
+    grid_import_today_kwh: float = 0.0
+    grid_export_today_kwh: float = 0.0
+    load_today_kwh: float = 0.0
+
+    
     # Raw payload cache for the Proxy
     raw_payload: bytes = b''
 

@@ -51,8 +51,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r4.isError(): raise ModbusIOException("Failed to read Segment 4 (3120)")
             time.sleep(0.05)
             
-            # Segment 3 (Battery) 3170-3184
-            r3 = client.read_input_registers(3170, count=15, device_id=1)
+            # Segment 3 (Battery) 3170-3189
+            r3 = client.read_input_registers(3170, count=20, device_id=1)
             if r3.isError(): raise ModbusIOException("Failed to read Segment 3 (3170)")
             
             reg1 = r1.registers
@@ -93,6 +93,13 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.bat_v = parse_u16(reg3[1]) / 10.0
             reading.bat_i = parse_s16(reg3[2]) / 10.0
             reading.bat_p = parse_s32(reg3[3], reg3[4]) / 10.0
+            
+            # Energy Counters
+            reading.pv_today_kwh = parse_u32(reg2[23], reg2[24]) / 10.0
+            reading.pv_total_kwh = parse_u32(reg2[25], reg2[26]) / 10.0
+            reading.grid_import_today_kwh = parse_u32(reg3[14], reg3[15]) / 10.0
+            reading.grid_export_today_kwh = parse_u32(reg3[16], reg3[17]) / 10.0
+            reading.load_today_kwh = parse_u32(reg3[18], reg3[19]) / 10.0
             
             # Mathematically derive instantaneous load since the register acts as a cumulative counter
             reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
