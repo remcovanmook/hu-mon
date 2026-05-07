@@ -33,4 +33,22 @@ def create_app(store: GrowattStore) -> Flask:
             'Connection': 'keep-alive'
         })
 
+    @app.route('/api/history')
+    def history():
+        from flask import request
+        hours = int(request.args.get('hours', 24))
+        since = int(time.time() * 1000) - (hours * 3600 * 1000)
+        
+        conn = store._get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM readings_1m WHERE ts >= ? ORDER BY ts ASC", (since,))
+        columns = [description[0] for description in cur.description]
+        
+        results = []
+        for row in cur.fetchall():
+            d = dict(zip(columns, row))
+            results.append(d)
+        
+        return json.dumps(results), 200, {'Content-Type': 'application/json'}
+
     return app

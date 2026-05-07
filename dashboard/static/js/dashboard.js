@@ -2,8 +2,61 @@
 "use strict";
 
 const charts = {};
-const maxPoints = 60;
 const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
+
+// Use exact Hegg colors
+const COLORS = {
+  pv: '#22c55e',
+  grid: '#f59e0b',
+  load: '#a855f7',
+  l1: '#ef4444',
+  l2: '#eab308',
+  l3: '#3b82f6',
+  pv1: '#3b82f6',
+  pv2: '#8b5cf6',
+  pv3: '#ec4899',
+  pv4: '#14b8a6'
+};
+
+const BASE_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    transitions: { active: { animation: { duration: 0 } } },
+    interaction: { mode: "index", intersect: false },
+    elements: {
+        point: { radius: 0, hitRadius: 6 },
+        line:  { tension: 0.3, borderWidth: 1.5 },
+    },
+    scales: {
+        x: {
+            type: "time",
+            time: {
+                tooltipFormat: "HH:mm:ss",
+                displayFormats: { second: "HH:mm:ss", minute: "HH:mm", hour: "HH:mm", day: "MMM d" },
+            },
+            ticks: { color: "#6b7490", maxTicksLimit: 8, font: { size: 11 } },
+            grid:  { color: "rgba(255,255,255,0.04)" },
+            border: { display: false },
+        },
+        y: {
+            ticks: { color: "#6b7490", font: { size: 11 } },
+            grid:  { color: "rgba(255,255,255,0.04)" },
+            border: { display: false },
+        },
+    },
+    plugins: {
+        legend: { display: true, labels: { color: "#9ca3af" } },
+        tooltip: {
+            backgroundColor: "rgba(22,26,34,0.95)",
+            borderColor: "rgba(255,255,255,0.1)",
+            borderWidth: 1,
+            titleColor: "#e8eaf0",
+            bodyColor: "#9ca3af",
+            padding: 10,
+        }
+    }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -25,37 +78,52 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
     createGroup('pv-w-cards', 'Power', 'W', 4, 'PV');
-    
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'Grid');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'Grid');
     createGroup('grid-w-cards', 'Power', 'W', 3, 'Grid');
 
     Chart.defaults.color = "#6b7490";
     charts.overview = createChart('chart-overview', [
-        { label: 'PV Generation (W)', color: '#22c55e' },
-        { label: 'Grid Net (W)', color: '#f59e0b' },
-        { label: 'Load (W)', color: '#a855f7' }
+        { label: 'PV Generation (W)', color: COLORS.pv },
+        { label: 'Grid Net (W)', color: COLORS.grid },
+        { label: 'Load (W)', color: COLORS.load }
     ]);
     charts.pv = createChart('chart-pv', [
-        { label: 'String 1 (W)', color: '#3b82f6' },
-        { label: 'String 2 (W)', color: '#8b5cf6' },
-        { label: 'String 3 (W)', color: '#ec4899' },
-        { label: 'String 4 (W)', color: '#14b8a6' }
+        { label: 'String 1 (W)', color: COLORS.pv1 },
+        { label: 'String 2 (W)', color: COLORS.pv2 },
+        { label: 'String 3 (W)', color: COLORS.pv3 },
+        { label: 'String 4 (W)', color: COLORS.pv4 }
     ]);
     charts.grid = createChart('chart-grid', [
-        { label: 'L1 Power (W)', color: '#ef4444' },
-        { label: 'L2 Power (W)', color: '#eab308' },
-        { label: 'L3 Power (W)', color: '#3b82f6' }
+        { label: 'L1 Power (W)', color: COLORS.l1 },
+        { label: 'L2 Power (W)', color: COLORS.l2 },
+        { label: 'L3 Power (W)', color: COLORS.l3 }
     ]);
     charts.battery = createChart('chart-battery', [
-        { label: 'Battery Power (W)', color: '#a855f7' }
+        { label: 'Battery Power (W)', color: COLORS.load }
     ]);
 
+    loadHistory();
     connectSSE();
+    
+    // Prune data outside 24h window
+    setInterval(() => {
+        const cutoff = Date.now() - 24 * 3600 * 1000;
+        Object.values(charts).forEach(c => {
+            let keepIdx = 0;
+            while(keepIdx < c.data.labels.length && c.data.labels[keepIdx] < cutoff) keepIdx++;
+            if(keepIdx > 0) {
+                c.data.labels.splice(0, keepIdx);
+                c.data.datasets.forEach(ds => ds.data.splice(0, keepIdx));
+                c.update('none');
+            }
+        });
+    }, 60000);
 });
 
 function createChart(id, series) {
     const ctx = document.getElementById(id).getContext('2d');
+    const opts = structuredClone(BASE_OPTS);
     return new Chart(ctx, {
         type: 'line',
         data: {
@@ -65,32 +133,68 @@ function createChart(id, series) {
                 data: [], fill: false, tension: 0.3, pointRadius: 0
             }))
         },
-        options: {
-            responsive: true, maintainAspectRatio: false, animation: false,
-            interaction: { mode: "index", intersect: false },
-            scales: { x: { display: false }, y: { grid: { color: "rgba(255,255,255,0.04)" } } },
-            plugins: { legend: { display: true } }
-        }
+        options: opts
     });
 }
 
 function updateDOM(id, val) {
     const el = document.getElementById(id);
     if(el) {
-        el.innerText = val;
-        el.classList.add("value-updated");
-        setTimeout(() => el.classList.remove("value-updated"), 300);
+        if (el.innerText !== String(val)) {
+            el.innerText = val;
+            el.classList.add("value-updated");
+            setTimeout(() => el.classList.remove("value-updated"), 300);
+        }
     }
 }
 
-function pushChart(chart, timeStr, values) {
-    chart.data.labels.push(timeStr);
+async function loadHistory() {
+    try {
+        const res = await fetch(`/api/history?hours=24`);
+        if(!res.ok) return;
+        const data = await res.json();
+        if(data.length === 0) return;
+        
+        const labels = [];
+        const datasets = {
+            overview: [[], [], []],
+            pv: [[], [], [], []],
+            grid: [[], [], []],
+            battery: [[]]
+        };
+        
+        data.forEach(d => {
+            labels.push(d.ts);
+            datasets.overview[0].push(d.pv_total_w_mean);
+            datasets.overview[1].push(d.meter_total_w_mean);
+            datasets.overview[2].push(d.load_p_mean);
+            
+            datasets.pv[0].push(d.pv1_w_mean);
+            datasets.pv[1].push(d.pv2_w_mean);
+            datasets.pv[2].push(d.pv3_w_mean);
+            datasets.pv[3].push(d.pv4_w_mean);
+            
+            datasets.grid[0].push(d.grid_l1_v_mean * d.grid_l1_a_mean);
+            datasets.grid[1].push(d.grid_l2_v_mean * d.grid_l2_a_mean);
+            datasets.grid[2].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
+            
+            datasets.battery[0].push(d.bat_p_mean);
+        });
+        
+        Object.keys(charts).forEach(k => {
+            charts[k].data.labels = [...labels];
+            charts[k].data.datasets.forEach((ds, i) => ds.data = [...datasets[k][i]]);
+            charts[k].update('none');
+        });
+    } catch(e) {
+        console.error("History load failed", e);
+    }
+}
+
+function pushChart(chart, ts, values) {
+    chart.data.labels.push(ts);
     for(let i=0; i<values.length; i++) {
         chart.data.datasets[i].data.push(values[i]);
-    }
-    if (chart.data.labels.length > maxPoints) {
-        chart.data.labels.shift();
-        for(let i=0; i<values.length; i++) chart.data.datasets[i].data.shift();
     }
     chart.update('none');
 }
@@ -107,27 +211,24 @@ function connectSSE() {
     const es = new EventSource("/stream");
     es.addEventListener("reading", (e) => {
         const d = JSON.parse(e.data);
-        const timeStr = new Date(d.ts).toLocaleTimeString();
+        const ts = d.ts;
         
         const statText = STATUS_MAP[d.status_code] || "UNKNOWN";
         let statClass = "status-ok";
         if (d.status_code === 0) statClass = "status-warn";
         else if (d.status_code === 3 || d.status_code === 4) statClass = "status-err";
 
-        // Summary Strip
+        // Summary
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         document.getElementById("sum-pv-hint").innerHTML = `Status: <span class="${statClass}">${statText}</span>`;
-        
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
         updateDOM("sum-grid-hint", d.meter_total_w >= 0 ? "Exporting" : "Importing");
         document.getElementById("sum-grid-card").className = d.meter_total_w >= 0 ? "card card--returned" : "card card--delivered";
-        
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
         updateDOM("sum-bat-hint", Math.abs(d.bat_p).toFixed(0) + " W " + (d.bat_p > 0 ? "Charging" : (d.bat_p < 0 ? "Discharging" : "Idle")));
-        
         updateDOM("sum-load", d.load_p.toFixed(0));
 
-        // Cute Diagram
+        // Flow Diagram
         updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
         updateDOM("flow-grid", Math.abs(d.meter_total_w).toFixed(0) + " W");
         updateDOM("flow-bat", Math.abs(d.bat_p).toFixed(0) + " W");
@@ -140,14 +241,12 @@ function connectSSE() {
         setFlowLine("line-inv-bat", Math.abs(d.bat_p) > 10, d.bat_p < 0);
         setFlowLine("line-inv-load", d.load_p > 10);
 
-        // Tab 2
         for(let i=1; i<=4; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
             updateDOM(`pv${i}-a`, d[`pv${i}_a`].toFixed(1));
             updateDOM(`pv${i}-w`, d[`pv${i}_w`].toFixed(0));
         }
 
-        // Tab 3
         const g1w = d.grid_l1_v * d.grid_l1_a;
         const g2w = d.grid_l2_v * d.grid_l2_a;
         const g3w = d.grid_l3_v * d.grid_l3_a;
@@ -159,16 +258,14 @@ function connectSSE() {
         updateDOM(`grid2-w`, g2w.toFixed(0));
         updateDOM(`grid3-w`, g3w.toFixed(0));
 
-        // Tab 4
         updateDOM("bat-v", d.bat_v.toFixed(1));
         updateDOM("bat-a", d.bat_i.toFixed(1));
         updateDOM("bat-w", d.bat_p.toFixed(0));
         updateDOM("bat-soc2", d.bat_soc.toFixed(1));
 
-        // Charts
-        pushChart(charts.overview, timeStr, [d.pv_total_w, d.meter_total_w, d.load_p]);
-        pushChart(charts.pv, timeStr, [d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
-        pushChart(charts.grid, timeStr, [g1w, g2w, g3w]);
-        pushChart(charts.battery, timeStr, [d.bat_p]);
+        pushChart(charts.overview, ts, [d.pv_total_w, d.meter_total_w, d.load_p]);
+        pushChart(charts.pv, ts, [d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
+        pushChart(charts.grid, ts, [g1w, g2w, g3w]);
+        pushChart(charts.battery, ts, [d.bat_p]);
     });
 }
