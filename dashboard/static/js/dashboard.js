@@ -151,21 +151,7 @@ function switchTab(id) {
 }
 
 
-const THEME_CYCLE  = ["light", "dark", "auto"];
-const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
 
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem("hegg-theme", theme);
-  const btn = document.getElementById("theme-toggle");
-  if (btn) btn.textContent = THEME_LABELS[theme] ?? theme;
-}
-
-function cycleTheme() {
-  const current = document.documentElement.dataset.theme || "light";
-  const next    = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
-  applyTheme(next);
-}
 
 document.addEventListener("DOMContentLoaded", () => {
     const toggleBtn = document.getElementById("theme-toggle");
