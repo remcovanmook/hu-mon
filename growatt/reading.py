@@ -33,6 +33,9 @@ class GrowattReading:
     grid_l3_a: float = 0.0
     grid_freq: float = 0.0
     meter_total_w: float = 0.0  # pos: export, neg: import
+    meter_l1_w: float = 0.0
+    meter_l2_w: float = 0.0
+    meter_l3_w: float = 0.0
 
     # Battery & Load
     bat_soc: float = 0.0

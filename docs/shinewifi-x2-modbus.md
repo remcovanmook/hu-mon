@@ -1,109 +1,60 @@
-This document provides the full technical specification for interacting with the **Growatt MOD 12KTL3-HU** hybrid inverter via the **ShineWifi-X2** datalogger.
-
----
-
 # Growatt 12KTL3-HU Interaction Specification
 **Interface:** Modbus TCP via ShineWifi-X2  
 **Protocol Version:** Growatt Modbus RTU Protocol II (Storage/Hybrid)  
-**Port:** `5020`
+**Port:** `502`
 
-## 1. Connection Parameters
-| Parameter | Value | Notes |
-| :--- | :--- | :--- |
-| **Transport** | TCP/IP | Local Network |
-| **Port** | `5020` | Specific to X2 series local Modbus |
-| **Slave ID** | `1` | Default (Adjustable in Inverter LCD settings) |
-| **Byte Order** | Big-Endian | High Byte first, then Low Byte |
-| **Register Order** | Big-Endian | High Register first (for 32-bit values) |
-| **Timeout** | `2.0s - 5.0s` | ShineWifi-X2 hardware is low-power |
+## Consolidated Register Map (Function Code 04)
 
----
-
-## 2. Data Types & Representation
-* **$U16$**: 16-bit Unsigned Integer (1 register).
-* **$S16$**: 16-bit Signed Integer (1 register, two's complement).
-* **$U32$**: 32-bit Unsigned Integer (2 registers). Value = $(Reg_{High} \times 65536) + Reg_{Low}$.
-* **$S32$**: 32-bit Signed Integer (2 registers, two's complement). Used for Grid and Battery power.
-* **Scaling**: Most values are scaled by $10$ ($0.1$) or $100$ ($0.01$). If a register value is $2305$ with a $0.1$ scale, the actual value is $230.5$.
-
----
-
-## 3. Input Register Map (Function Code 04)
-These registers are Read-Only and provide real-time telemetry.
-
-### 3.1. System Status & PV Input (MPPT 1-4)
 | Address | Name | Type | Unit | Scale | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **3000** | Inverter Status | $U16$ | — | 1 | 0:Wait, 1:Normal, 3:Fault |
-| **3001-2** | P_PV_Total | $U32$ | $W$ | 0.1 | Combined input power |
-| **3003** | PV1_Voltage | $U16$ | $V$ | 0.1 | String 1 Voltage |
-| **3004** | PV1_Current | $U16$ | $A$ | 0.1 | String 1 Current |
-| **3005-6** | PV1_Power | $U32$ | $W$ | 0.1 | String 1 Watts |
-| **3007** | PV2_Voltage | $U16$ | $V$ | 0.1 | String 2 Voltage |
-| **3008** | PV2_Current | $U16$ | $A$ | 0.1 | String 2 Current |
-| **3009-10**| PV2_Power | $U32$ | $W$ | 0.1 | String 2 Watts |
-| **3011** | PV3_Voltage | $U16$ | $V$ | 0.1 | String 3 Voltage |
-| **3012** | PV3_Current | $U16$ | $A$ | 0.1 | String 3 Current |
-| **3013-14**| PV3_Power | $U32$ | $W$ | 0.1 | String 3 Watts |
-| **3015** | PV4_Voltage | $U16$ | $V$ | 0.1 | String 4 Voltage |
-| **3016** | PV4_Current | $U16$ | $A$ | 0.1 | String 4 Current |
-| **3017-18**| PV4_Power | $U32$ | $W$ | 0.1 | String 4 Watts |
-
-### 3.2. Grid & Meter (3-Phase)
-| Address | Name | Type | Unit | Scale | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **3030** | V_Grid_L1 | $U16$ | $V$ | 0.1 | Phase 1 Voltage |
-| **3031** | I_Grid_L1 | $U16$ | $A$ | 0.1 | Phase 1 Current |
-| **3034** | V_Grid_L2 | $U16$ | $V$ | 0.1 | Phase 2 Voltage |
-| **3035** | I_Grid_L2 | $U16$ | $A$ | 0.1 | Phase 2 Current |
-| **3038** | V_Grid_L3 | $U16$ | $V$ | 0.1 | Phase 3 Voltage |
-| **3039** | I_Grid_L3 | $U16$ | $A$ | 0.1 | Phase 3 Current |
-| **3042** | Frequency | $U16$ | $Hz$ | 0.01 | Grid Frequency |
-| **3121-2** | P_Meter_Total| $S32$ | $W$ | 0.1 | **Pos: Export, Neg: Import** |
-
-### 3.3. Battery & Load
-| Address | Name | Type | Unit | Scale | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **3170** | Battery_SOC | $U16$ | $\%$ | 1 | State of Charge (0-100) |
-| **3171** | Battery_V | $U16$ | $V$ | 0.1 | High Voltage Bus |
-| **3172** | Battery_I | $S16$ | $A$ | 0.1 | Pos: Charge, Neg: Discharge |
-| **3173-4** | Battery_P | $S32$ | $W$ | 0.1 | Pos: Charge, Neg: Discharge |
-| **3048-9** | Load_P | $U32$ | $W$ | 0.1 | Total House Load |
-| **3120** | EPS_P | $U32$ | $W$ | 0.1 | Power on Backup Port |
-
----
-
-## 4. Status and Error Decoding
-### Inverter Status (Reg 3000)
-* **0**: Waiting (Startup or low light)
-* **1**: Normal (Generating or Battery active)
-* **3**: Fault (Red LED active, system halted)
-* **4**: Flash (Firmware updating)
-
-### Fault Codes (Reg 3091)
-* **201**: Leakage current too high
-* **202**: DC Isolation error
-* **300**: Grid AC voltage out of range
-* **302**: Grid frequency out of range
-
----
-
-## 5. Interaction Sequence (Polling Strategy)
-Due to the memory constraints of the ESP32 in the ShineWifi-X2, the following interaction sequence is required for stability:
-
-1.  **Open Connection**: Establish Modbus TCP on 5020.
-2.  **Poll Segment 1 (PV/Status)**: Read `3000` for 25 registers.
-3.  **Short Wait**: Delay `50ms - 100ms`.
-4.  **Poll Segment 2 (Grid/Load)**: Read `3030` for 30 registers.
-5.  **Short Wait**: Delay `50ms - 100ms`.
-6.  **Poll Segment 3 (Battery)**: Read `3170` for 15 registers.
-7.  **Calculate & Store**:
-    * Assemble 32-bit values.
-    * Coerce any floating PV values ($6553.5V$) to $0$.
-    * Apply scaling.
-8.  **Close or Idle**: Either close the socket or wait `5 seconds` before the next cycle.
-
-## 6. Known Constraints
-* **Max Register Read**: Do not exceed **64 registers** per single Modbus request.
-* **Concurrent Connections**: The ShineWifi-X2 generally supports only **one** concurrent TCP connection on 5020. If multiple clients connect, the datalogger often reboots.
-* **Night Mode**: When PV voltage is zero, some registers may hold their "Last Known Good" value or revert to `0xFFFF` ($65535$). The API must filter these.
+| **SYSTEM & PV DATA** | | | | | |
+| 3000 | Inverter Status | U16 | — | 1 | 0:Wait, 1:Normal, 3:Fault |
+| 3001-02 | PV Total Power | U32 | W | 0.1 | Combined power from all strings |
+| 3003-04 | PV1 Voltage / Current | U16×2 | V/A | 0.1 | String 1 |
+| 3005-06 | PV1 Power | U32 | W | 0.1 | String 1 Wattage |
+| 3007-08 | PV2 Voltage / Current | U16×2 | V/A | 0.1 | String 2 |
+| 3009-10 | PV2 Power | U32 | W | 0.1 | String 2 Wattage |
+| 3011-12 | PV3 Voltage / Current | U16×2 | V/A | 0.1 | String 3 |
+| 3013-14 | PV3 Power | U32 | W | 0.1 | String 3 Wattage |
+| 3015-16 | PV4 Voltage / Current | U16×2 | V/A | 0.1 | String 4 |
+| 3017-18 | PV4 Power | U32 | W | 0.1 | String 4 Wattage |
+| **GRID & METER (3-PHASE)** | | | | | |
+| 3030-31 | L1 Voltage / Current | U16×2 | V/A | 0.1 | Inverter Grid Phase 1 |
+| 3034-35 | L2 Voltage / Current | U16×2 | V/A | 0.1 | Inverter Grid Phase 2 |
+| 3038-39 | L3 Voltage / Current | U16×2 | V/A | 0.1 | Inverter Grid Phase 3 |
+| 3042 | Grid Frequency | U16 | Hz | 0.01 | Main frequency (e.g. 5000 = 50.00Hz) |
+| 3121-22 | Total Meter Power | S32 | W | 0.1 | Net Power (+ Export, - Import) |
+| 3123-24 | Phase L1 Power | S32 | W | 0.1 | Net Power on Phase 1 |
+| 3125-26 | Phase L2 Power | S32 | W | 0.1 | Net Power on Phase 2 |
+| 3127-28 | Phase L3 Power | S32 | W | 0.1 | Net Power on Phase 3 |
+| **HOUSE & EPS (BACKUP)** | | | | | |
+| 3048-49 | Total House Load | U32 | W | 0.1 | Calculated property consumption |
+| 3118 | EPS Voltage L1 | U16 | V | 0.1 | Voltage on backup port L1 |
+| 3120-21 | EPS Total Power | U32 | W | 0.1 | Combined backup load |
+| 3130 | EPS Voltage L2 | U16 | V | 0.1 | Voltage on backup port L2 |
+| 3131 | EPS Current L1 | U16 | A | 0.1 | Amps on backup Phase 1 |
+| 3132 | EPS Voltage L3 | U16 | V | 0.1 | Voltage on backup port L3 |
+| 3133 | EPS Current L2 | U16 | A | 0.1 | Amps on backup Phase 2 |
+| 3135 | EPS Current L3 | U16 | A | 0.1 | Amps on backup Phase 3 |
+| 3136-37 | EPS Power L1 | U32 | W | 0.1 | Backup Load on Phase 1 |
+| 3138-39 | EPS Power L2 | U32 | W | 0.1 | Backup Load on Phase 2 |
+| 3140-41 | EPS Power L3 | U32 | W | 0.1 | Backup Load on Phase 3 |
+| **BATTERY (HIGH VOLTAGE)** | | | | | |
+| 3170 | Battery SOC | U16 | % | 1 | State of Charge (0-100) |
+| 3171 | Battery Voltage | U16 | V | 0.1 | DC Bus voltage |
+| 3172 | Battery Current | S16 | A | 0.1 | Pos: Charge, Neg: Discharge |
+| 3173-74 | Battery Power | S32 | W | 0.1 | Pos: Charge, Neg: Discharge |
+| 3175 | Battery Temperature | U16 | °C | 0.1 | Internal BMS NTC value |
+| **ENERGY COUNTERS (TOTALS)** | | | | | |
+| 3053-54 | PV Yield Today | U32 | kWh | 0.1 | Solar generated today |
+| 3055-56 | PV Yield Total | U32 | kWh | 0.1 | Solar lifetime |
+| 3176-77 | Bat Discharge Today | U32 | kWh | 0.1 | Energy from battery today |
+| 3180-81 | Bat Charge Today | U32 | kWh | 0.1 | Energy to battery today |
+| 3184-85 | Grid Import Today | U32 | kWh | 0.1 | Bought from grid today |
+| 3186-87 | Grid Export Today | U32 | kWh | 0.1 | Sold to grid today |
+| 3188-89 | Load Energy Today | U32 | kWh | 0.1 | Total house usage today |
+| **DIAGNOSTICS** | | | | | |
+| 3091 | Fault Code | U16 | — | 1 | Inverter main error code |
+| 3092 | Warning Code | U16 | — | 1 | Inverter warning bitmask |
+| 3114 | Inverter Temperature | U16 | °C | 0.1 | Internal heat sink temp |
+| 3115 | Boost Temperature | U16 | °C | 0.1 | DC-DC converter temp |

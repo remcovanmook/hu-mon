@@ -46,8 +46,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             if r2.isError(): raise ModbusIOException("Failed to read Segment 2 (3030)")
             time.sleep(0.05)
 
-            # Segment 4 (Meter/EPS) 3120-3122
-            r4 = client.read_input_registers(3120, count=3, device_id=1)
+            # Segment 4 (Meter/EPS) 3120-3128
+            r4 = client.read_input_registers(3120, count=9, device_id=1)
             if r4.isError(): raise ModbusIOException("Failed to read Segment 4 (3120)")
             time.sleep(0.05)
             
@@ -88,6 +88,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             
             reading.eps_p = parse_u32(reg4[0], reg4[1]) / 10.0
             reading.meter_total_w = parse_s32(reg4[1], reg4[2]) / 10.0
+            reading.meter_l1_w = parse_s32(reg4[3], reg4[4]) / 10.0
+            reading.meter_l2_w = parse_s32(reg4[5], reg4[6]) / 10.0
+            reading.meter_l3_w = parse_s32(reg4[7], reg4[8]) / 10.0
             
             reading.bat_soc = parse_u16(reg3[0])
             reading.bat_v = parse_u16(reg3[1]) / 10.0

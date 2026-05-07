@@ -206,20 +206,17 @@ function connectSSE() {
         updateDOM("sum-grid-total", d.grid_export_today_kwh.toFixed(0));
 
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        // Assume standard 10kWh ARK battery capacity for calculation
-        const bat_kwh = (d.bat_soc / 100.0) * 10.0;
-        updateDOM("sum-bat-kwh", bat_kwh.toFixed(1));
-        const autonomy = d.load_p > 0 ? (bat_kwh * 1000 / d.load_p).toFixed(1) : "—";
-        updateDOM("sum-bat-autonomy", autonomy);
+        updateDOM("sum-bat-kwh", "—");
+        updateDOM("sum-bat-autonomy", "—");
         
         updateDOM("sum-load", d.load_p.toFixed(0));
         updateDOM("sum-load-today", d.load_today_kwh.toFixed(1));
         
-        // Per-phase estimation (assuming balanced until we pull smart meter registers)
-        const est_l1 = (d.load_p / 3).toFixed(0);
-        updateDOM("sum-load-l1", est_l1);
-        updateDOM("sum-load-l2", est_l1);
-        updateDOM("sum-load-l3", est_l1);
+        // Exact per-phase load derived from meter phase data + symmetric inverter assumption
+        const inv_per_phase = (d.load_p + d.meter_total_w) / 3;
+        updateDOM("sum-load-l1", (inv_per_phase - (d.meter_l1_w || 0)).toFixed(0));
+        updateDOM("sum-load-l2", (inv_per_phase - (d.meter_l2_w || 0)).toFixed(0));
+        updateDOM("sum-load-l3", (inv_per_phase - (d.meter_l3_w || 0)).toFixed(0));
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
 
 
