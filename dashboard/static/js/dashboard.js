@@ -188,6 +188,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const el = document.getElementById(id);
         if(!el) return;
         
+        const colorMap = {
+            'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
+            'Grid': [COLORS.l1, COLORS.l2, COLORS.l3]
+        };
+
         let html = '';
         for(let i=1; i<=count; i++) {
             const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
@@ -213,10 +218,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // Initialize sparkline charts
         for(let i=1; i<=count; i++) {
             const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
-            const colorMap = {
-                'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
-                'Grid': [COLORS.l1, COLORS.l2, COLORS.l3]
-            };
             const color = colorMap[l_prefix][i-1] || COLORS.pv1;
             charts[chartId] = createChart(chartId, [{ label: `${l_prefix}${i} ${label}`, color: color }], false);
         }
