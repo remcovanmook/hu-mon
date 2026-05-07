@@ -199,7 +199,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const colorMap = {
             'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
-            'L': [COLORS.l1, COLORS.l2, COLORS.l3]
+            'L': [COLORS.l1, COLORS.l2, COLORS.l3],
+            'eps': [COLORS.l1, COLORS.l2, COLORS.l3]
         };
 
         let html = '';
