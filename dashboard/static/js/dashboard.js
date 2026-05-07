@@ -346,9 +346,9 @@ async function loadHistory(hours = 24) {
             }
             lastStatus = statusStr;
 
-            ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
+            ds.overview[0].push(d.pv_total_w_mean); ds.overview[1].push(-d.meter_total_w_mean); ds.overview[2].push(d.load_p_mean);
             ds.pv[0].push(d.pv_total_w_mean); ds.pv[1].push(d.pv1_w_mean); ds.pv[2].push(d.pv2_w_mean); ds.pv[3].push(d.pv3_w_mean); ds.pv[4].push(d.pv4_w_mean);
-            ds.grid[0].push(d.meter_total_w_mean); ds.grid[1].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[2].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[3].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
+            ds.grid[0].push(-d.meter_total_w_mean); ds.grid[1].push(d.grid_l1_v_mean * d.grid_l1_a_mean); ds.grid[2].push(d.grid_l2_v_mean * d.grid_l2_a_mean); ds.grid[3].push(d.grid_l3_v_mean * d.grid_l3_a_mean);
             ds.battery[0].push(d.bat_p_mean);
             
             for(let i=1; i<=4; i++) {
@@ -601,9 +601,9 @@ function connectSSE() {
         updateDOM("bat-w", d.bat_p.toFixed(0));
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
-        pushChart(charts.overview, ts, [d.pv_total_w, d.meter_total_w, d.load_p]);
+        pushChart(charts.overview, ts, [d.pv_total_w, -d.meter_total_w, d.load_p]);
         pushChart(charts.pv, ts, [d.pv_total_w, d.pv1_w, d.pv2_w, d.pv3_w, d.pv4_w]);
-        pushChart(charts.grid, ts, [d.meter_total_w, g1w, g2w, g3w]);
+        pushChart(charts.grid, ts, [-d.meter_total_w, g1w, g2w, g3w]);
         pushChart(charts.battery, ts, [d.bat_p]);
     });
 }
