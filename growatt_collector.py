@@ -202,10 +202,6 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.raw_payload = json.dumps(raw_dict).encode('utf-8')
 
             import dataclasses
-            with open("debug_reading.json", "w") as f:
-                d = {f.name: getattr(reading, f.name) for f in dataclasses.fields(reading)}
-                d["raw_payload"] = "hidden"
-                json.dump(d, f, indent=2)
 
             store.insert(reading)
 
