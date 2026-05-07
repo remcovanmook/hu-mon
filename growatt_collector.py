@@ -215,7 +215,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             raw_dict = {}
             for i, val in enumerate(reg1): raw_dict[str(3000 + i)] = val
             for i, val in enumerate(reg2): raw_dict[str(3030 + i)] = val
-            for i, val in enumerate(reg4): raw_dict[str(3120 + i)] = val
+            for i, val in enumerate(reg4): raw_dict[str(3115 + i)] = val
             for i, val in enumerate(reg3): raw_dict[str(3170 + i)] = val
             for i, val in enumerate(r5.registers): raw_dict[str(i)] = val
             reading.raw_payload = json.dumps(raw_dict).encode('utf-8')

@@ -76,7 +76,7 @@ INSERT INTO {table} (
     ?, ?, 
     ?, ?, 
     ?, ?, ?, ?, 
-    ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?
 ) ON CONFLICT(ts, serial) DO UPDATE SET
     n = n + 1,
     pv_total_w_mean = (pv_total_w_mean * n + excluded.pv_total_w_mean) / (n + 1),
