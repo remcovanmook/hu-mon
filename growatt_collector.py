@@ -142,8 +142,23 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.grid_l1_a = parse_u16(reg2[1]) / 10.0
             reading.grid_l2_v = parse_u16(reg2[4]) / 10.0
             reading.grid_l2_a = parse_u16(reg2[5]) / 10.0
-            reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
-            reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
+            
+            # Autodetect Standard vs Frankenstein MOD-HU Protocol II map
+            v_l1 = parse_u16(reg2[0])
+            v_3038 = parse_u16(reg2[8])
+            v_3048 = parse_u16(reg2[18])
+            
+            ratio = v_3038 / v_l1 if v_l1 > 0 else 0
+            
+            if 1.6 < ratio < 1.85 and 1800 < v_3048 < 2700:
+                # Frankenstein Profile: L3 displaced by Delta voltages
+                reading.grid_l3_v = parse_u16(reg2[18]) / 10.0 # 3048
+                reading.grid_l3_a = parse_u16(reg2[17]) / 10.0 # 3047 (Current is sitting before Voltage here)
+            else:
+                # Standard Profile
+                reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
+                reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
+                
             reading.grid_freq = parse_u16(reg2[12]) / 100.0
             
 
