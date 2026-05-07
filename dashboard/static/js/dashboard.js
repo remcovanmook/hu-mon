@@ -136,19 +136,13 @@ function createChart(id, series) {
     const ctx = el.getContext('2d');
     
     const datasets = series.map(s => {
-        let bg = s.color + '22';
-        if (s.fill !== false) {
-            bg = ctx.createLinearGradient(0, 0, 0, 300);
-            bg.addColorStop(0, s.color + '66');
-            bg.addColorStop(1, s.color + '05');
-        }
         return {
             label: s.label, 
             borderColor: s.color, 
-            backgroundColor: bg,
+            backgroundColor: s.color,
             data: [], 
-            fill: 'origin', 
-            tension: 0.4, 
+            fill: false, 
+            tension: 0.1, 
             pointRadius: 0,
             borderWidth: 2,
             borderCapStyle: 'round'
