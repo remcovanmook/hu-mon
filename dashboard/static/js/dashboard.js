@@ -193,15 +193,28 @@ function connectSSE() {
         const d = JSON.parse(e.data);
         const ts = d.ts;
         
+        
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
+        // sum-pv-today and sum-pv-total await backend registers
+
         updateDOM("sum-grid", Math.abs(d.meter_total_w).toFixed(0));
         updateDOM("sum-grid-stat", d.meter_total_w >= 0 ? "Exporting" : "Importing");
+        // sum-grid-today and sum-grid-total await backend registers
+
         updateDOM("sum-bat", d.bat_soc.toFixed(1));
-        updateDOM("sum-bat-stat", Math.abs(d.bat_p).toFixed(0) + " W");
-        updateDOM("sum-bat-w", d.bat_p.toFixed(0));
+        // sum-bat-kwh awaits capacity configuration
+        // sum-bat-autonomy awaits load-based math
+        
         updateDOM("sum-load", d.load_p.toFixed(0));
+        
+        // Per-phase estimation (assuming balanced until we pull smart meter registers)
+        const est_l1 = (d.load_p / 3).toFixed(0);
+        updateDOM("sum-load-l1", est_l1);
+        updateDOM("sum-load-l2", est_l1);
+        updateDOM("sum-load-l3", est_l1);
         updateDOM("overview-net-val", d.meter_total_w.toFixed(0));
+
 
         for(let i=1; i<=4; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
