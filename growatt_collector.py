@@ -119,6 +119,10 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 
             reg1 = r1.registers
             reg2 = r2.registers
+            try:
+                with open("scratch/regs.txt", "w") as f:
+                    f.write(str(reg2))
+            except Exception: pass
             reg4 = r4.registers
             reg3 = r3.registers
 
