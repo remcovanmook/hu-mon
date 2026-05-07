@@ -167,8 +167,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 
             reading.fault_code = parse_u16(reg2[61])
             
-            # Temperature is at 3094 (shift of -20), which is reg2[64]
+            # Temperature is at 3094 and 3095 (shift of -20), which is reg2[64] and reg2[65]
             reading.inverter_temp = parse_u16(reg2[64]) / 10.0
+            reading.boost_temp = parse_u16(reg2[65]) / 10.0
             
             # Segment 4 contains Temp, EPS and Meter. Starts at 3110.
             reg4 = r4.registers if len(r4.registers) >= 45 else [0]*45

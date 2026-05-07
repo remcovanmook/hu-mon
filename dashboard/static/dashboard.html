@@ -226,6 +226,25 @@
           </div>
           <div class="chart-wrapper"><canvas id="chart-power" aria-label="Net power history"></canvas></div>
         </div>
+        
+        <!-- Mini Charts -->
+        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
+          <div class="card mini-chart" style="padding: 1rem;">
+            <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top:0; margin-bottom: 0.5rem;">Grid Frequency</h3>
+            <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; font-family: monospace;" id="val-freq">— Hz</div>
+            <div style="height: 60px; position: relative;"><canvas id="chart-freq"></canvas></div>
+          </div>
+          <div class="card mini-chart" style="padding: 1rem;">
+            <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top:0; margin-bottom: 0.5rem;">Inverter Temp</h3>
+            <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; font-family: monospace;" id="val-inv-temp">— °C</div>
+            <div style="height: 60px; position: relative;"><canvas id="chart-inv-temp"></canvas></div>
+          </div>
+          <div class="card mini-chart" style="padding: 1rem;">
+            <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top:0; margin-bottom: 0.5rem;">Boost Temp</h3>
+            <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; font-family: monospace;" id="val-bst-temp">— °C</div>
+            <div style="height: 60px; position: relative;"><canvas id="chart-bst-temp"></canvas></div>
+          </div>
+        </div>
 
       </div>
     </div><!-- /#tab-overview -->

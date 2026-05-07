@@ -67,6 +67,7 @@ class GrowattReading:
     inverter_firmware: str = ""
     rated_power_w: int = 0
     inverter_temp: float = 0.0
+    boost_temp: float = 0.0
     fault_code: int = 0
 
     

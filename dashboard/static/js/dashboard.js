@@ -280,6 +280,10 @@ document.addEventListener("DOMContentLoaded", () => {
         charts.eps.data.datasets[i].stack = 'phases';
         charts.eps.data.datasets[i].fill = true;
     }
+    
+    charts.freq = createChart('chart-freq', [{ label: 'Grid Freq', color: COLORS.pv1 }], false);
+    charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
+    charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
     const tickClock = () => {
         const el = document.getElementById("header-time");
@@ -363,7 +367,7 @@ async function loadHistory(hours = 24) {
         if(data.length === 0) return;
         
         const labels = [];
-        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]] };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]], freq: [[]], invTemp: [[]], bstTemp: [[]] };
         
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
@@ -386,6 +390,7 @@ async function loadHistory(hours = 24) {
             ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
             ds.eps[0].push(Math.round(d.eps_p_mean)); ds.eps[1].push(Math.round(d.eps_l1_v_mean * d.eps_l1_a_mean)); ds.eps[2].push(Math.round(d.eps_l2_v_mean * d.eps_l2_a_mean)); ds.eps[3].push(Math.round(d.eps_l3_v_mean * d.eps_l3_a_mean));
+            ds.freq[0].push(d.grid_freq_mean); ds.invTemp[0].push(d.inverter_temp_mean); ds.bstTemp[0].push(d.boost_temp_mean);
             
             for(let i=1; i<=4; i++) {
                 let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
@@ -679,5 +684,12 @@ function connectSSE() {
         }
         updateDOM("sum-eps-val", Math.abs(d.eps_p).toFixed(0));
         pushChart(charts.eps, ts, [Math.round(d.eps_p), Math.round(e1w), Math.round(e2w), Math.round(e3w)]);
+        
+        updateDOM("val-freq", (d.grid_freq !== undefined ? d.grid_freq.toFixed(2) + " Hz" : "—"));
+        updateDOM("val-inv-temp", (d.inverter_temp !== undefined ? d.inverter_temp.toFixed(1) + " °C" : "—"));
+        updateDOM("val-bst-temp", (d.boost_temp !== undefined ? d.boost_temp.toFixed(1) + " °C" : "—"));
+        pushChart(charts.freq, ts, [d.grid_freq]);
+        pushChart(charts.invTemp, ts, [d.inverter_temp]);
+        pushChart(charts.bstTemp, ts, [d.boost_temp]);
     });
 }
