@@ -59,8 +59,11 @@ These registers are Read-Only and provide real-time telemetry.
 | 04 (Input) | 3038-39 | Grid L3 V / I | U16×2 | V/A | 0.1 | Grid Phase 3 status (Standard Profile) |
 | 04 (Input) | 3025 | Grid Freq | U16 | Hz | 0.01 | Displaced Grid Frequency (HU-Hybrid Profile) |
 | 04 (Input) | 3026-27 | Grid L1 V / I | U16×2 | V/A | 0.1 | Displaced Grid Phase 1 (HU-Hybrid Profile) |
+| 04 (Input) | 3028-29 | Grid L1 Power | U32 | W | 0.1 | Displaced Phase 1 Active Power |
 | 04 (Input) | 3030-31 | Grid L2 V / I | U16×2 | V/A | 0.1 | Displaced Grid Phase 2 (HU-Hybrid Profile) |
+| 04 (Input) | 3032-33 | Grid L2 Power | U32 | W | 0.1 | Displaced Phase 2 Active Power |
 | 04 (Input) | 3034-35 | Grid L3 V / I | U16×2 | V/A | 0.1 | Displaced Grid Phase 3 (HU-Hybrid Profile) |
+| 04 (Input) | 3036-37 | Grid L3 Power | U32 | W | 0.1 | Displaced Phase 3 Active Power |
 | 04 (Input) | 3038-40 | Grid L-L V | U16×3 | V | 0.1 | V_RS, V_ST, V_TR Delta (HU-Hybrid Profile) |
 | 04 (Input) | 3121-22 | Total Meter P | S32 | W | 0.1 | Net (+ Export, - Import) |
 | 04 (Input) | 3123-24 | Meter L1 P | S32 | W | 0.1 | Phase 1 Net Power |
