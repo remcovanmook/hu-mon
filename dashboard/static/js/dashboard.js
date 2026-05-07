@@ -63,7 +63,7 @@ function updateSparklineAnnotations(chart, min, max, color) {
       type: 'line', yMin: max, yMax: max, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
       label: { display: true, content: max.toFixed(1), position: 'start', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
     }
-  });
+  };
 }
 
 const extremes = {
