@@ -48,8 +48,8 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 time.sleep(2)
                 continue
 
-            # Read Legacy serial OR new serial, and read Firmware
-            r_meta = client.read_holding_registers(9, count=50, device_id=1)
+            # Read base holding registers (0-125) to get Firmware, Module ID, and Device Type
+            r_meta = client.read_holding_registers(0, count=125, device_id=1)
             # Read New Serial Number from 3001 (15 Regs)
             r_serial = client.read_holding_registers(3001, count=15, device_id=1)
             
@@ -63,11 +63,12 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                         b.extend(r.to_bytes(2, 'big'))
                     return b.decode('ascii', 'ignore').replace('\x00', '').strip()
                 
-                inverter_firmware = decode_ascii(regs_meta[0:6])     # 9-14
-                inverter_serial = decode_ascii(regs_ser)        # 3001-3015
+                inverter_firmware = decode_ascii(regs_meta[9:15])     # Reg 9-14
+                inverter_serial = decode_ascii(regs_ser)              # 3001-3015
+                device_type = regs_meta[121]                          # Reg 121
                 
-                # Algorithmic Module ID decode (Reg 28-29 = index 19-20)
-                module_id = (regs_meta[19] << 16) | regs_meta[20]
+                # Algorithmic Module ID decode (Reg 28-29)
+                module_id = (regs_meta[28] << 16) | regs_meta[29]
                 if module_id == 0:
                     # Fallback if Modbus proxy zeros it out
                     inverter_model = "MOD 12KTL3-HU"
@@ -77,10 +78,28 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                     power_watts = module_id & 0xFFFF
                     series_map = {0x05: "MIN", 0x0B: "MOD", 0x0C: "MID", 0x0D: "SPH", 0x0E: "SPA", 0x0F: "MIC", 0x10: "MAC", 0x11: "MAX"}
                     series_prefix = series_map.get(series_code, "Unknown")
-                    if series_prefix == "MOD" and power_watts >= 3000:
-                        inverter_model = f"{series_prefix} {int(power_watts/1000)}KTL3-HU"
+                    
+                    # Construct Suffix dynamically
+                    suffix = ""
+                    if power_watts >= 3000:
+                        suffix += "KTL"
+                        power_display = f"{int(power_watts/1000)}"
                     else:
-                        inverter_model = f"{series_prefix} {power_watts}W"
+                        power_display = f"{power_watts}"
+                        
+                    if series_prefix in ["MOD", "MID", "MAC", "MAX"]:
+                        suffix += "3"
+                        
+                    if device_type == 6:
+                        suffix += "-HU"
+                    elif device_type == 4:
+                        suffix += "-XH"
+                        
+                    if suffix:
+                        inverter_model = f"{series_prefix} {power_display}{suffix}"
+                    else:
+                        inverter_model = f"{series_prefix} {power_display}W"
+                        
                     inverter_rated_power_w = power_watts * 10 if power_watts < 1000 else power_watts
                 
                 logging.info(f"Discovered Device: {inverter_model} (Serial: {inverter_serial}) FW: {inverter_firmware}")

@@ -175,11 +175,11 @@ The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3
 2. **`TL` (Transformer-Less):** Assumed universally for all modern Growatt grid-tied architectures.
 3. **`3` (Three-Phase):** Explicitly appended if the Series is natively 3-phase (like `MOD`, `MID`, `MAX`).
 4. **`-HU` / `-XH` (Feature Suffix):** 
-   * **`-XH`**: Battery-ready.
-   * **`-HU`**: Full Hybrid (High-Voltage). 
-   * *Note:* The specific generation or feature suffix is notoriously difficult to extract from the base Modbus registers. It is usually inferred via system capabilities (e.g., if the inverter responds to EPS blocks and APX battery holding registers, it is a Hybrid `-HU`).
+   * Suffixes are explicitly derived from the **Device Type** flag located at **Holding Register 121**.
+   * If `Reg[121] == 6`: Full Hybrid (High-Voltage APX). Appends `-HU`.
+   * If `Reg[121] == 4`: Battery-Ready (No EPS). Appends `-XH`.
 
-*(Example: `module_id` yields `MOD` and `12000`. It is $\ge 3000$, so it becomes `12K`. `MOD` is 3-phase, adding `TL3`. Hybrid APX battery features are active, appending `-HU`. Final result: `MOD 12KTL3-HU`.)*
+*(Example: `module_id` yields `MOD` and `12000`. It is $\ge 3000$, so it becomes `12K`. `MOD` is natively 3-phase, adding `TL3`. `Reg[121]` returns `6` (Storage/Hybrid), appending `-HU`. Final result: `MOD 12KTL3-HU`.)*
 
 ### Inverter Status (Input Reg 3000)
 * **0**: Waiting (Startup or low light)
