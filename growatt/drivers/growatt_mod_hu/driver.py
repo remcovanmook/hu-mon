@@ -57,6 +57,14 @@ _MOD_HU_SERIES = {0x0B, 0x0C, 0x0D, 0x10, 0x11}  # MOD, MID, SPH, MAC, MAX
 _DEVICE_TYPE_HU = 6   # Full Hybrid (High-Voltage APX)
 _DEVICE_TYPE_XH = 4   # Battery-Ready (No EPS)
 
+# Phase count: definitionally 3 for all devices this driver matches.
+# _probe_series() only accepts 3-phase series codes, so this is not
+# an assumption — it is a consequence of a successful probe.
+_PHASES = 3
+
+# Battery Type register (Holding 1001): 0 = none/unconfigured, 1 = Lithium (APX).
+_REG_BATTERY_TYPE = 1001
+
 # ---------------------------------------------------------------------------
 # Polling segment definitions.
 # Each tuple: (function_code_label, start_address, count)
@@ -77,7 +85,7 @@ _FC_LABEL = {"holding": 3, "input": 4}
 # read_device_info().
 _PROXY_HOLDING_RANGES = [
     (0,    125),   # Low metadata block (firmware, module_id, device type, etc.)
-    (1005,   1),   # Battery nominal capacity
+    (1001,   5),   # Battery: type (1001), design capacity (1002), nominal energy (1005)
     (3001,  15),   # Serial number
 ]
 
@@ -195,20 +203,31 @@ class GrowattModHuDriver(GrowattBaseDriver):
         Read one-time static metadata from the device.
 
         Reads:
+        - Holding 1001: battery type (0 = none, 1 = Lithium APX)
         - Holding 1005: battery nominal energy (kWh × 0.1)
         - Holding 0–124: firmware string, module_id, device type
         - Holding 3001–3015: 30-character inverter serial number
+
+        pv_strings is not set: no register in Protocol II reports the number
+        of MPPT inputs configured on this unit.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
         :raises ModbusIOException: If any register read fails.
         """
+        # Battery type — determines whether a battery is actually configured.
+        r_bat_type = client.read_holding_registers(_REG_BATTERY_TYPE, count=1, device_id=slave_id)
+        if r_bat_type.isError():
+            raise ModbusIOException("Failed to read battery type (Reg 1001)")
+        battery_configured = r_bat_type.registers[0] != 0
+
         # Battery nominal capacity
         r_bat = client.read_holding_registers(1005, count=1, device_id=slave_id)
         if r_bat.isError():
             raise ModbusIOException("Failed to read battery nominal capacity (Reg 1005)")
         bat_nominal_kwh = r_bat.registers[0] / 10.0
-        logger.info("Battery capacity: %.1f kWh", bat_nominal_kwh)
+        logger.info("Battery type reg=%d  nominal=%.1f kWh",
+                    r_bat_type.registers[0], bat_nominal_kwh)
 
         # Base metadata block
         r_meta = client.read_holding_registers(0, count=125, device_id=slave_id)
@@ -234,10 +253,10 @@ class GrowattModHuDriver(GrowattBaseDriver):
             firmware=firmware,
             rated_power_w=rated_w,
             bat_nominal_kwh=bat_nominal_kwh,
-            phases=3,
-            pv_strings=4,
+            phases=_PHASES,
+            pv_strings=None,   # No Protocol II register reports MPPT string count.
             has_eps=(device_type == _DEVICE_TYPE_HU),
-            has_battery=True,
+            has_battery=battery_configured,
         )
 
     def read_registers(self, client, slave_id: int) -> GrowattReading:

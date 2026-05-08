@@ -38,10 +38,10 @@ class DeviceInfo:
     firmware: str
     rated_power_w: int
     bat_nominal_kwh: float
-    phases: int          # 1 (single-phase) or 3 (three-phase)
-    pv_strings: int      # Number of MPPT strings (1–4)
-    has_eps: bool        # True if the device has EPS/backup output
-    has_battery: bool    # True if a battery system is attached
+    phases: int              # 1 (single-phase) or 3 (three-phase)
+    pv_strings: Optional[int]  # Number of MPPT strings; None if not readable from registers
+    has_eps: bool            # True if the device has EPS/backup output
+    has_battery: bool        # True if a battery system is confirmed attached
 
 
 @dataclass

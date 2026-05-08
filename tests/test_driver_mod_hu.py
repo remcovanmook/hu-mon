@@ -145,11 +145,11 @@ class TestDecodeModel(unittest.TestCase):
 
 class TestReadDeviceInfo(unittest.TestCase):
 
-    def _make_client(self):
+    def _make_client(self, bat_type=1):
         client = MagicMock()
-        # Reg 1005: bat 5.0 kWh → raw 50
         client.read_holding_registers.side_effect = [
-            _mock_registers([50]),                   # Reg 1005
+            _mock_registers([bat_type]),             # Reg 1001: battery type
+            _mock_registers([50]),                   # Reg 1005: bat 5.0 kWh
             _mock_registers(_make_holding_block()),  # Reg 0–124
             _mock_registers([0x4142] * 15),          # Reg 3001–3015 (serial)
         ]
@@ -165,10 +165,21 @@ class TestReadDeviceInfo(unittest.TestCase):
         info = driver.read_device_info(self._make_client(), slave_id=1)
         self.assertEqual(info.phases, 3)
 
-    def test_has_battery(self):
+    def test_has_battery_when_type_register_nonzero(self):
+        driver = GrowattModHuDriver()
+        info = driver.read_device_info(self._make_client(bat_type=1), slave_id=1)
+        self.assertTrue(info.has_battery)
+
+    def test_no_battery_when_type_register_zero(self):
+        driver = GrowattModHuDriver()
+        info = driver.read_device_info(self._make_client(bat_type=0), slave_id=1)
+        self.assertFalse(info.has_battery)
+
+    def test_pv_strings_is_none(self):
+        # No Protocol II register reports MPPT string count.
         driver = GrowattModHuDriver()
         info = driver.read_device_info(self._make_client(), slave_id=1)
-        self.assertTrue(info.has_battery)
+        self.assertIsNone(info.pv_strings)
 
     def test_has_eps_for_type_6(self):
         driver = GrowattModHuDriver()
