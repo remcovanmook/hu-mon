@@ -192,73 +192,139 @@ class TestReadDeviceInfo(unittest.TestCase):
 # Tests: read_registers — standard profile
 # ---------------------------------------------------------------------------
 
+def _make_seg1(overrides=None):
+    """
+    Build a 125-register Segment 1 block (base 3000).
+
+    :param overrides: dict of {index: value} to set after zero-fill.
+    """
+    regs = [0] * 125
+    if overrides:
+        for k, v in overrides.items():
+            regs[k] = v
+    return regs
+
+
+def _make_seg2(overrides=None):
+    """Build a 125-register Segment 2 block (base 3125)."""
+    regs = [0] * 125
+    if overrides:
+        for k, v in overrides.items():
+            regs[k] = v
+    return regs
+
+
 class TestReadRegistersStandard(unittest.TestCase):
 
-    def _make_reg1(self):
-        """Segment 1 (3000–3029): PV data, no North Star trigger."""
-        regs = [0] * 30
-        regs[0] = 1      # status: Normal
-        regs[1] = 0      # pv_total_w high
-        regs[2] = 5000   # pv_total_w low → 500.0 W
-        # Regs 25/26 below North Star threshold
-        regs[25] = 0
-        regs[26] = 0
-        return regs
+    def _make_client(self, s1=None, s2=None):
+        """
+        Return a mock client that serves 3-segment reads.
 
-    def _make_reg2(self):
-        """Segment 2 (3030–3109): Grid / counters."""
-        regs = [0] * 80
-        regs[0] = 2300   # L1 V → 230.0 V (standard profile)
-        regs[12] = 5000  # freq → 50.00 Hz
-        return regs
-
-    def _make_reg3(self):
-        """Segment 3 (3110–3154): Meter / EPS."""
-        regs = [0] * 45
-        return regs
-
-    def _make_reg4(self):
-        """Segment 4 (3170–3189): Battery."""
-        regs = [0] * 20
-        regs[0] = 85    # SOC %
-        regs[1] = 500   # bat_v → 50.0 V (wait, that's divided by 10)
-        return regs
-
-    def _make_client(self):
+        :param s1: dict of {index: value} overrides for Segment 1 (base 3000).
+        :param s2: dict of {index: value} overrides for Segment 2 (base 3125).
+        """
         client = MagicMock()
         client.read_input_registers.side_effect = [
-            _mock_registers(self._make_reg1()),
-            _mock_registers(self._make_reg2()),
-            _mock_registers(self._make_reg3()),
-            _mock_registers(self._make_reg4()),
-            _mock_registers([0] * 125),  # Segment 5
+            _mock_registers(_make_seg1(s1)),
+            _mock_registers(_make_seg2(s2)),
+            _mock_registers([0] * 125),   # Segment 3: low-block mirror
         ]
         return client
 
     def test_status_code(self):
-        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={0: 1}), 1)
         self.assertEqual(reading.status_code, 1)
 
     def test_pv_total_w(self):
-        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        # 3001-3002 = s1[1]/s1[2]; raw 5000 in low word -> 500.0 W
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={1: 0, 2: 5000}), 1)
         self.assertAlmostEqual(reading.pv_total_w, 500.0)
 
     def test_standard_profile_l1_voltage(self):
-        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        # Standard profile: Vac1 at s1[26] (3026); freq at s1[25] below threshold.
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={25: 0, 26: 2300}), 1)
         self.assertAlmostEqual(reading.grid_l1_v, 230.0)
 
     def test_standard_profile_frequency(self):
-        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        # Standard profile: Fac at s1[42] (3042); raw 5000 -> 50.00 Hz.
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={25: 0, 42: 5000}), 1)
         self.assertAlmostEqual(reading.grid_freq, 50.0)
 
+    def test_inverter_temp(self):
+        # Temp2 at s1[94] (3094); raw 250 -> 25.0 C
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={94: 250}), 1)
+        self.assertAlmostEqual(reading.inverter_temp, 25.0)
+
+    def test_boost_temp(self):
+        # Temp3 at s1[95] (3095); raw 300 -> 30.0 C
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={95: 300}), 1)
+        self.assertAlmostEqual(reading.boost_temp, 30.0)
+
+    def test_fault_code(self):
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={105: 7}), 1)
+        self.assertEqual(reading.fault_code, 7)
+
+    def test_pv_today_kwh(self):
+        # 3049-3050 = s1[49]/s1[50]; raw 100 -> 10.0 kWh
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={49: 0, 50: 100}), 1)
+        self.assertAlmostEqual(reading.pv_today_kwh, 10.0)
+
+    def test_meter_total_w(self):
+        # 3121-3122 = s1[121]/s1[122]; S32 raw 500 -> 50.0 W
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s1={121: 0, 122: 500}), 1)
+        self.assertAlmostEqual(reading.meter_total_w, 50.0)
+
+    def test_bat_discharge_today_kwh(self):
+        # 3125-3126 = s2[0]/s2[1]; raw 200 -> 20.0 kWh
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={0: 0, 1: 200}), 1)
+        self.assertAlmostEqual(reading.bat_discharge_today_kwh, 20.0)
+
+    def test_bat_charge_today_kwh(self):
+        # 3129-3130 = s2[4]/s2[5]; raw 150 -> 15.0 kWh
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={4: 0, 5: 150}), 1)
+        self.assertAlmostEqual(reading.bat_charge_today_kwh, 15.0)
+
+    def test_eps_l1_voltage(self):
+        # EPSVac1 at s2[21] (3146); raw 2300 -> 230.0 V
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={21: 2300}), 1)
+        self.assertAlmostEqual(reading.eps_l1_v, 230.0)
+
+    def test_eps_total_power(self):
+        # EPSPacTotal at s2[33]/s2[34] (3158-3159); raw 1000 -> 100.0 W
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={33: 0, 34: 1000}), 1)
+        self.assertAlmostEqual(reading.eps_p, 100.0)
+
     def test_bat_soc(self):
-        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        # SOC at s2[46] (3171)
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={46: 85}), 1)
         self.assertEqual(reading.bat_soc, 85)
 
-    def test_raw_payload_is_json(self):
+    def test_bat_voltage(self):
+        # Vbat at s2[44] (3169); scale 0.01 V; raw 5000 -> 50.00 V
+        reading = GrowattModHuDriver().read_registers(
+            self._make_client(s2={44: 5000}), 1)
+        self.assertAlmostEqual(reading.bat_v, 50.0)
+
+    def test_raw_payload_contains_all_segments(self):
         reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
         payload = json.loads(reading.raw_payload.decode())
         self.assertIn("3000", payload)
+        self.assertIn("3125", payload)
+        self.assertIn("0",    payload)
 
 
 # ---------------------------------------------------------------------------
@@ -267,22 +333,22 @@ class TestReadRegistersStandard(unittest.TestCase):
 
 class TestReadRegistersShifted(unittest.TestCase):
 
-    def _make_reg1_shifted(self):
-        """Segment 1 with North Star: freq at reg[25], L1V at reg[26]."""
-        regs = [0] * 30
-        regs[0] = 1
-        regs[25] = 5000   # freq → 50.00 Hz (> 4000 threshold)
-        regs[26] = 2305   # L1 V → 230.5 V (> 1000 threshold)
-        regs[27] = 120    # L1 A → 12.0 A
-        return regs
-
-    def _make_client(self):
+    def _make_client(self, extra_s1=None):
+        s1 = {
+            25: 5000,   # Fac -> 50.00 Hz  (> 4000 threshold)
+            26: 2305,   # Vac1 -> 230.5 V  (> 1000 threshold)
+            27: 120,    # Iac1 -> 12.0 A
+            30: 2310,   # Vac2 -> 231.0 V
+            31: 115,    # Iac2 -> 11.5 A
+            34: 2295,   # Vac3 -> 229.5 V
+            35: 118,    # Iac3 -> 11.8 A
+        }
+        if extra_s1:
+            s1.update(extra_s1)
         client = MagicMock()
         client.read_input_registers.side_effect = [
-            _mock_registers(self._make_reg1_shifted()),
-            _mock_registers([0] * 80),
-            _mock_registers([0] * 45),
-            _mock_registers([0] * 20),
+            _mock_registers(_make_seg1(s1)),
+            _mock_registers(_make_seg2()),
             _mock_registers([0] * 125),
         ]
         return client
@@ -298,6 +364,14 @@ class TestReadRegistersShifted(unittest.TestCase):
     def test_shifted_l1_current(self):
         reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
         self.assertAlmostEqual(reading.grid_l1_a, 12.0)
+
+    def test_shifted_l2_voltage(self):
+        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        self.assertAlmostEqual(reading.grid_l2_v, 231.0)
+
+    def test_shifted_l3_voltage(self):
+        reading = GrowattModHuDriver().read_registers(self._make_client(), 1)
+        self.assertAlmostEqual(reading.grid_l3_v, 229.5)
 
 
 # ---------------------------------------------------------------------------
@@ -333,8 +407,8 @@ class TestProxyConfig(unittest.TestCase):
         self.assertIn((0, 125), self.cfg.address_map[1][3])
 
     def test_fc4_covers_primary_telemetry(self):
-        # Segment 1 (PV) must appear.
-        self.assertIn((3000, 30), self.cfg.address_map[1][4])
+        # Segment 1 now covers the full 3000-3124 block per spec.
+        self.assertIn((3000, 125), self.cfg.address_map[1][4])
 
 
 if __name__ == '__main__':

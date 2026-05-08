@@ -60,6 +60,8 @@ class GrowattReading:
     load_today_kwh: float = 0.0
     bat_charge_today_kwh: float = 0.0
     bat_discharge_today_kwh: float = 0.0
+    bat_charge_total_kwh: float = 0.0
+    bat_discharge_total_kwh: float = 0.0
 
     # Metadata
     inverter_model: str = ""

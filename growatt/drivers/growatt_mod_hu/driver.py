@@ -70,11 +70,9 @@ _REG_BATTERY_TYPE = 1001
 # Each tuple: (function_code_label, start_address, count)
 # ---------------------------------------------------------------------------
 SEGMENTS = [
-    ("input",   3000,  30),   # Segment 1: PV / Status
-    ("input",   3030,  80),   # Segment 2: Grid / Counters / Temp
-    ("input",   3110,  45),   # Segment 3: Meter / EPS / Temp
-    ("input",   3170,  20),   # Segment 4: Battery BMS
-    ("input",      0, 125),   # Segment 5: Low-block mirror (proxy)
+    ("input", 3000, 125),   # Segment 1: 3000–3124 (PV, grid, counters, temp, fault)
+    ("input", 3125, 125),   # Segment 2: 3125–3249 (bat energy, EPS, BDC, BMS)
+    ("input",    0, 125),   # Segment 3: 0–124 low-block mirror (proxy)
 ]
 
 # Mapping from SEGMENTS label strings to Modbus function code integers.
@@ -263,139 +261,142 @@ class GrowattModHuDriver(GrowattBaseDriver):
         """
         Execute one full telemetry poll cycle.
 
-        Reads five register segments (see SEGMENTS), applies the North Star
-        shifted-profile heuristic to select the correct register offsets for
-        grid data, assembles all fields into a GrowattReading, and packages the
-        raw register snapshot as a JSON blob for the Modbus proxy.
+        Reads three register segments aligned to the spec-defined block
+        boundaries (Section 1.2), applies the North Star shifted-profile
+        heuristic for grid data, and packages the raw snapshot for the proxy.
+
+        Segment layout (FC 04, Input Registers):
+          Seg 1: 3000–3124  PV, grid, freq, energy counters, temps, fault codes
+          Seg 2: 3125–3249  Battery energy, EPS, BDC state, BMS live data
+          Seg 3:    0–124   Low-block mirror (proxy cache)
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
         :raises ModbusIOException: If any mandatory segment read fails.
         """
-        r1 = client.read_input_registers(3000, count=30, device_id=slave_id)
+        r1 = client.read_input_registers(3000, count=125, device_id=slave_id)
         if r1.isError():
-            raise ModbusIOException("Failed to read Segment 1 (3000–3029)")
+            raise ModbusIOException("Failed to read Segment 1 (3000–3124)")
         time.sleep(_INTER_SEGMENT_SLEEP)
 
-        r2 = client.read_input_registers(3030, count=80, device_id=slave_id)
+        r2 = client.read_input_registers(3125, count=125, device_id=slave_id)
         if r2.isError():
-            raise ModbusIOException("Failed to read Segment 2 (3030–3109)")
+            raise ModbusIOException("Failed to read Segment 2 (3125–3249)")
         time.sleep(_INTER_SEGMENT_SLEEP)
 
-        r3 = client.read_input_registers(3110, count=45, device_id=slave_id)
+        r3 = client.read_input_registers(0, count=125, device_id=slave_id)
         if r3.isError():
-            raise ModbusIOException("Failed to read Segment 3 (3110–3154)")
+            raise ModbusIOException("Failed to read Segment 3 (low-block mirror)")
 
-        r4 = client.read_input_registers(3170, count=20, device_id=slave_id)
-        if r4.isError():
-            raise ModbusIOException("Failed to read Segment 4 (3170–3189)")
-
-        r5 = client.read_input_registers(0, count=125, device_id=slave_id)
-        if r5.isError():
-            raise ModbusIOException("Failed to read Segment 5 (low-block mirror)")
-
-        reg1 = r1.registers
-        reg2 = r2.registers
-        reg3 = r3.registers  # Segment 3: Meter / EPS / Temp (base addr 3110)
-        reg4 = r4.registers  # Segment 4: Battery (base addr 3170)
+        s1 = r1.registers   # base 3000
+        s2 = r2.registers   # base 3125
 
         reading = GrowattReading()
 
-        # Status
-        reading.status_code = _u16(reg1[0])  # 3000
+        # --- Status ---
+        reading.status_code = _u16(s1[0])           # 3000
 
-        # PV strings
-        reading.pv_total_w = _u32(reg1[1], reg1[2]) / 10.0   # 3001–3002
-        reading.pv1_v = _u16(reg1[3]) / 10.0                  # 3003
-        reading.pv1_a = _u16(reg1[4]) / 10.0                  # 3004
-        reading.pv1_w = _u32(reg1[5], reg1[6]) / 10.0         # 3005–3006
-        reading.pv2_v = _u16(reg1[7]) / 10.0                  # 3007
-        reading.pv2_a = _u16(reg1[8]) / 10.0                  # 3008
-        reading.pv2_w = _u32(reg1[9], reg1[10]) / 10.0        # 3009–3010
-        reading.pv3_v = _u16(reg1[11]) / 10.0                 # 3011
-        reading.pv3_a = _u16(reg1[12]) / 10.0                 # 3012
-        reading.pv3_w = _u32(reg1[13], reg1[14]) / 10.0       # 3013–3014
-        reading.pv4_v = _u16(reg1[15]) / 10.0                 # 3015
-        reading.pv4_a = _u16(reg1[16]) / 10.0                 # 3016
-        reading.pv4_w = _u32(reg1[17], reg1[18]) / 10.0       # 3017–3018
+        # --- PV strings ---
+        reading.pv_total_w = _u32(s1[1], s1[2]) / 10.0    # 3001–3002
+        reading.pv1_v      = _u16(s1[3]) / 10.0           # 3003
+        reading.pv1_a      = _u16(s1[4]) / 10.0           # 3004
+        reading.pv1_w      = _u32(s1[5], s1[6]) / 10.0    # 3005–3006
+        reading.pv2_v      = _u16(s1[7]) / 10.0           # 3007
+        reading.pv2_a      = _u16(s1[8]) / 10.0           # 3008
+        reading.pv2_w      = _u32(s1[9], s1[10]) / 10.0   # 3009–3010
+        reading.pv3_v      = _u16(s1[11]) / 10.0          # 3011
+        reading.pv3_a      = _u16(s1[12]) / 10.0          # 3012
+        reading.pv3_w      = _u32(s1[13], s1[14]) / 10.0  # 3013–3014
+        reading.pv4_v      = _u16(s1[15]) / 10.0          # 3015
+        reading.pv4_a      = _u16(s1[16]) / 10.0          # 3016
+        reading.pv4_w      = _u32(s1[17], s1[18]) / 10.0  # 3017–3018
 
-        # North Star shifted-profile detection.
-        # If Reg 3025 carries a plausible grid frequency (> 4000 = 40Hz × 100)
-        # and Reg 3026 carries a plausible L1 voltage (> 1000 = 100V × 10),
-        # the grid block has been shifted -5 relative to the standard map.
-        freq_3025 = _u16(reg1[25]) if len(reg1) > 25 else 0
-        v_3026 = _u16(reg1[26]) if len(reg1) > 26 else 0
+        # --- Grid / North Star shifted-profile detection ---
+        # 3025: Fac (grid freq × 100). Threshold > 4000 → 40 Hz → plausible.
+        # 3026: Vac1 (L1 voltage × 10). Threshold > 1000 → 100 V → plausible.
+        # Both conditions together uniquely identify the shifted firmware profile.
+        freq_3025 = _u16(s1[25])
+        v_3026    = _u16(s1[26])
 
         if freq_3025 > 4000 and v_3026 > 1000:
-            # Shifted (MOD-HU v7.6+) profile
-            reading.grid_freq = freq_3025 / 100.0
-            reading.grid_l1_v = v_3026 / 10.0
-            reading.grid_l1_a = _u16(reg1[27]) / 10.0
-            reading.grid_l2_v = _u16(reg2[0]) / 10.0
-            reading.grid_l2_a = _u16(reg2[1]) / 10.0
-            reading.grid_l3_v = _u16(reg2[4]) / 10.0
-            reading.grid_l3_a = _u16(reg2[5]) / 10.0
+            # Shifted (MOD-HU v7.6+): grid block starts at 3025
+            reading.grid_freq = freq_3025 / 100.0          # 3025
+            reading.grid_l1_v = v_3026 / 10.0              # 3026
+            reading.grid_l1_a = _u16(s1[27]) / 10.0        # 3027
+            reading.grid_l2_v = _u16(s1[30]) / 10.0        # 3030
+            reading.grid_l2_a = _u16(s1[31]) / 10.0        # 3031
+            reading.grid_l3_v = _u16(s1[34]) / 10.0        # 3034
+            reading.grid_l3_a = _u16(s1[35]) / 10.0        # 3035
         else:
-            # Standard profile
-            reading.grid_freq = _u16(reg2[12]) / 100.0        # 3042
-            reading.grid_l1_v = _u16(reg2[0]) / 10.0          # 3030
-            reading.grid_l1_a = _u16(reg2[1]) / 10.0          # 3031
-            reading.grid_l2_v = _u16(reg2[4]) / 10.0          # 3034
-            reading.grid_l2_a = _u16(reg2[5]) / 10.0          # 3035
-            reading.grid_l3_v = _u16(reg2[8]) / 10.0          # 3038
-            reading.grid_l3_a = _u16(reg2[9]) / 10.0          # 3039
+            # Standard profile: grid block starts at 3026
+            reading.grid_freq = _u16(s1[42]) / 100.0       # 3042 (Ptouserh offset)
+            reading.grid_l1_v = _u16(s1[26]) / 10.0        # 3026
+            reading.grid_l1_a = _u16(s1[27]) / 10.0        # 3027
+            reading.grid_l2_v = _u16(s1[30]) / 10.0        # 3030
+            reading.grid_l2_a = _u16(s1[31]) / 10.0        # 3031
+            reading.grid_l3_v = _u16(s1[34]) / 10.0        # 3034
+            reading.grid_l3_a = _u16(s1[35]) / 10.0        # 3035
 
-        # Temperature (MOD-HU -20 shift puts these at 3094/3095 = reg2[64/65])
-        reading.inverter_temp = _u16(reg2[64]) / 10.0
-        reading.boost_temp = _u16(reg2[65]) / 10.0
+        # --- Energy counters (Segment 1, base 3000) ---
+        reading.pv_today_kwh = _u32(s1[49], s1[50]) / 10.0     # 3049–3050
+        reading.pv_total_kwh = _u32(s1[51], s1[52]) / 10.0     # 3051–3052
 
-        # Fault code at 3105 = reg2[75]
-        reading.fault_code = _u16(reg2[75])
+        # --- Temperature (Segment 1, base 3000) ---
+        # Spec: Temp2 (IPM) at 3094, Temp3 (boost) at 3095
+        reading.inverter_temp = _u16(s1[94]) / 10.0             # 3094
+        reading.boost_temp    = _u16(s1[95]) / 10.0             # 3095
 
-        # Smart Meter (Segment 3, base 3110)
-        reading.meter_total_w = _s32(reg3[11], reg3[12]) / 10.0  # 3121–3122
-        reading.meter_l1_w = _s32(reg3[13], reg3[14]) / 10.0     # 3123–3124
-        reading.meter_l2_w = _s32(reg3[15], reg3[16]) / 10.0     # 3125–3126
-        reading.meter_l3_w = _s32(reg3[17], reg3[18]) / 10.0     # 3127–3128
+        # --- Fault / Warning (Segment 1) ---
+        reading.fault_code = _u16(s1[105])                       # 3105
 
-        # EPS V/A block 3130–3135 (reg3[20–25])
-        reading.eps_l1_v = _u16(reg3[20]) / 10.0
-        reading.eps_l1_a = _u16(reg3[21]) / 10.0
-        reading.eps_l2_v = _u16(reg3[22]) / 10.0
-        reading.eps_l2_a = _u16(reg3[23]) / 10.0
-        reading.eps_l3_v = _u16(reg3[24]) / 10.0
-        reading.eps_l3_a = _u16(reg3[25]) / 10.0
-        reading.eps_p = (
-            reading.eps_l1_v * reading.eps_l1_a
-            + reading.eps_l2_v * reading.eps_l2_a
-            + reading.eps_l3_v * reading.eps_l3_a
-        )
+        # --- Smart Meter (Segment 1) ---
+        # 3121 = s1[121], 3122 = s1[122], etc.
+        reading.meter_total_w = _s32(s1[121], s1[122]) / 10.0   # 3121–3122
+        reading.meter_l1_w    = _s32(s1[123], s1[124]) / 10.0   # 3123–3124
 
-        # Battery (Segment 4, base 3170)
-        reading.bat_soc = _u16(reg4[0])
-        reading.bat_v = _u16(reg4[1]) / 10.0
-        reading.bat_i = _s16(reg4[2]) / 10.0
-        reading.bat_p = _s32(reg4[3], reg4[4]) / 10.0
+        # --- Battery energy counters (Segment 2, base 3125) ---
+        reading.bat_discharge_today_kwh = _u32(s2[0],  s2[1])  / 10.0  # 3125–3126
+        reading.bat_discharge_total_kwh = _u32(s2[2],  s2[3])  / 10.0  # 3127–3128  (new)
+        reading.bat_charge_today_kwh    = _u32(s2[4],  s2[5])  / 10.0  # 3129–3130
+        reading.bat_charge_total_kwh    = _u32(s2[6],  s2[7])  / 10.0  # 3131–3132  (new)
 
-        # Energy counters
-        reading.pv_today_kwh = _u32(reg2[19], reg2[20]) / 10.0         # 3049–3050
-        reading.pv_total_kwh = _u32(reg2[21], reg2[22]) / 10.0         # 3051–3052
-        reading.bat_discharge_today_kwh = _u32(reg4[6], reg4[7]) / 10.0  # 3176–3177
-        reading.bat_charge_today_kwh = _u32(reg4[10], reg4[11]) / 10.0   # 3180–3181
-        reading.grid_import_today_kwh = _u32(reg4[14], reg4[15]) / 10.0  # 3184–3185
-        reading.grid_export_today_kwh = _u32(reg4[16], reg4[17]) / 10.0  # 3186–3187
-        reading.load_today_kwh = _u32(reg4[18], reg4[19]) / 10.0         # 3188–3189
+        # --- Meter L2/L3 (Segment 2, base 3125) ---
+        # 3125 is Edischr_today — meter L2/L3 are not directly in the spec block.
+        # NOTE: meter_l2_w and meter_l3_w are not available in this segment.
+        # They were previously read from wrong addresses. Set to 0 until verified.
+        reading.meter_l2_w = 0.0
+        reading.meter_l3_w = 0.0
 
-        # Derived: instantaneous load (PV - grid export/import - battery)
+        # --- EPS (Segment 2, base 3125) ---
+        # Spec: EPSFac 3145, EPSVac1 3146, EPSIac1 3147, EPSPac1 3148–3149,
+        #        EPSVac2 3150, EPSIac2 3151, EPSPac2 3152–3153,
+        #        EPSVac3 3154, EPSIac3 3155, EPSPac3 3156–3157,
+        #        EPSPacTotal 3158–3159.
+        reading.eps_l1_v = _u16(s2[21]) / 10.0                  # 3146
+        reading.eps_l1_a = _u16(s2[22]) / 10.0                  # 3147
+        reading.eps_l2_v = _u16(s2[25]) / 10.0                  # 3150
+        reading.eps_l2_a = _u16(s2[26]) / 10.0                  # 3151
+        reading.eps_l3_v = _u16(s2[29]) / 10.0                  # 3154
+        reading.eps_l3_a = _u16(s2[30]) / 10.0                  # 3155
+        # Total EPS power read directly from register (not computed from V×I).
+        reading.eps_p    = _u32(s2[33], s2[34]) / 10.0          # 3158–3159
+
+        # --- Battery BMS live (Segment 2, base 3125) ---
+        # Spec BDC1 block: 3166 SysState, 3169 Vbat (0.01V), 3170 Ibat (0.1A),
+        #                  3171 SOC (1%), 3178–3179 Pdischr, 3180–3181 Pchr.
+        reading.bat_soc = _u16(s2[46])                           # 3171
+        reading.bat_v   = _u16(s2[44]) / 100.0                  # 3169 (0.01 V)
+        reading.bat_i   = _s16(s2[45]) / 10.0                   # 3170 (0.1 A)
+        reading.bat_p   = _s32(s2[55], s2[56]) / 10.0           # 3180–3181 (charge)
+
+        # --- Derived ---
         reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
 
-        # Raw register snapshot for the Modbus proxy
+        # --- Raw register snapshot for the Modbus proxy ---
         raw = {}
-        for i, v in enumerate(reg1): raw[str(3000 + i)] = v
-        for i, v in enumerate(reg2): raw[str(3030 + i)] = v
-        for i, v in enumerate(reg3): raw[str(3110 + i)] = v
-        for i, v in enumerate(reg4): raw[str(3170 + i)] = v
-        for i, v in enumerate(r5.registers): raw[str(i)] = v
+        for i, v in enumerate(s1):         raw[str(3000 + i)] = v
+        for i, v in enumerate(s2):         raw[str(3125 + i)] = v
+        for i, v in enumerate(r3.registers): raw[str(i)] = v
         reading.raw_payload = json.dumps(raw).encode('utf-8')
 
         return reading
