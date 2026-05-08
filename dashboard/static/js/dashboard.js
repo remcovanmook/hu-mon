@@ -72,6 +72,7 @@ const extremes = {
     pv_c: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
     grid_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
     grid_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
+    grid_ll: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
     eps_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
     eps_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity}))
 };
@@ -216,6 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Clear extremes
         for(let i=0; i<4; i++) { extremes.pv_v[i] = {min: Infinity, max: -Infinity}; extremes.pv_c[i] = {min: Infinity, max: -Infinity}; }
         for(let i=0; i<3; i++) { extremes.grid_v[i] = {min: Infinity, max: -Infinity}; extremes.grid_c[i] = {min: Infinity, max: -Infinity};
+            extremes.grid_ll[i] = {min: Infinity, max: -Infinity};
             extremes.eps_v[i] = {min: Infinity, max: -Infinity};
             extremes.eps_c[i] = {min: Infinity, max: -Infinity}; }
         statusAnnotations = {};
@@ -226,26 +228,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     
     // Auto-create DOM cards for phase arrays matching HEGG template
-    const createGroup = (id, label, unit, count, l_prefix) => {
+    const createGroup = (id, label, unit, count, l_prefix, labels) => {
         const el = document.getElementById(id);
         if(!el) return;
         
         const colorMap = {
-            'PV': [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
-            'L': [COLORS.l1, COLORS.l2, COLORS.l3],
+            'PV':  [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
+            'L':   [COLORS.l1, COLORS.l2, COLORS.l3],
+            'LL':  [COLORS.l1, COLORS.l2, COLORS.l3],
             'eps': [COLORS.l1, COLORS.l2, COLORS.l3]
         };
 
         let html = '';
         for(let i=1; i<=count; i++) {
             const chartId = `chart-${label.toLowerCase()[0]}-${l_prefix.toLowerCase()}${i}`;
-            const valueId = `${l_prefix.toLowerCase()}${i}-${label.toLowerCase()[0]}`; // e.g. pv1-v, pv1-a
-            
-            const color = colorMap[l_prefix][i-1] || COLORS.pv1;
+            const valueId = `${l_prefix.toLowerCase()}${i}-${label.toLowerCase()[0]}`;
+            const badgeLabel = labels ? labels[i-1] : `${l_prefix}${i}`;
+            const color = (colorMap[l_prefix] || [])[i-1] || COLORS.pv1;
             html += `
             <article class="card card--phase card--with-chart">
               <div class="phase-row">
-                <div class="phase-badge" style="background: ${color}; color: #fff;">${l_prefix}${i}</div>
+                <div class="phase-badge" style="background: ${color}; color: #fff;">${badgeLabel}</div>
                 <div class="phase-value-group">
                   <div class="card-value" id="${valueId}" style="color: ${color}">—</div>
                   <div class="card-unit">${unit}</div>
@@ -270,6 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
+    createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['RS', 'ST', 'TR']);
     createGroup('eps-v-cards', 'Voltage', 'V', 3, 'eps');
     createGroup('eps-a-cards', 'Current', 'A', 3, 'eps');
 
@@ -405,6 +409,8 @@ async function loadHistory(hours = 24) {
         // Initialize arrays for sparklines
         for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
         for(let i=1; i<=3; i++) { ds[`chart-v-l${i}`] = [[]]; ds[`chart-c-l${i}`] = [[]]; }
+        const llKeys = ['rs', 'st', 'tr'];
+        for(let i=1; i<=3; i++) { ds[`chart-v-ll${i}`] = [[]]; }
 
         let firstTs = null;
 
@@ -449,6 +455,11 @@ async function loadHistory(hours = 24) {
                 if(ev > extremes.eps_v[i-1].max) extremes.eps_v[i-1].max = ev;
                 if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
                 if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
+
+                let llv = d[[`grid_ll_rs_v_mean`, `grid_ll_st_v_mean`, `grid_ll_tr_v_mean`][i-1]] || 0;
+                ds[`chart-v-ll${i}`][0].push(llv);
+                if(llv < extremes.grid_ll[i-1].min) extremes.grid_ll[i-1].min = llv;
+                if(llv > extremes.grid_ll[i-1].max) extremes.grid_ll[i-1].max = llv;
             }
         });
         
@@ -473,6 +484,8 @@ async function loadHistory(hours = 24) {
         syncChartScales(pvCCharts, extremes.pv_c, 0);
         syncChartScales(gridVCharts, extremes.grid_v, 0);
         syncChartScales(gridCCharts, extremes.grid_c, 0);
+        const gridLLCharts = [1,2,3].map(i => charts[`chart-v-ll${i}`]);
+        syncChartScales(gridLLCharts, extremes.grid_ll, 0);
         const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
         const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
         syncChartScales(epsVCharts, extremes.eps_v, 0);
@@ -486,6 +499,7 @@ async function loadHistory(hours = 24) {
         for(let i=1; i<=3; i++) {
             updateSparklineAnnotations(charts[`chart-v-l${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-l${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-ll${i}`], extremes.grid_ll[i-1].min, extremes.grid_ll[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
@@ -612,6 +626,13 @@ function connectSSE() {
             if(ec < extremes.eps_c[i-1].min) extremes.eps_c[i-1].min = ec;
             if(ec > extremes.eps_c[i-1].max) extremes.eps_c[i-1].max = ec;
 
+            const llKey = [`grid_ll_rs_v`, `grid_ll_st_v`, `grid_ll_tr_v`][i-1];
+            const llv = d[llKey] || 0;
+            updateDOM(`ll${i}-v`, llv.toFixed(1));
+            pushChart(charts[`chart-v-ll${i}`], ts, [llv]);
+            if(llv < extremes.grid_ll[i-1].min) extremes.grid_ll[i-1].min = llv;
+            if(llv > extremes.grid_ll[i-1].max) extremes.grid_ll[i-1].max = llv;
+
         }
         
         // Live Sync
@@ -623,6 +644,8 @@ function connectSSE() {
         syncChartScales(pvCCharts, extremes.pv_c, 0);
         syncChartScales(gridVCharts, extremes.grid_v, 0);
         syncChartScales(gridCCharts, extremes.grid_c, 0);
+        const gridLLCharts = [1,2,3].map(i => charts[`chart-v-ll${i}`]);
+        syncChartScales(gridLLCharts, extremes.grid_ll, 0);
         const epsVCharts = [1,2,3].map(i => charts[`chart-v-eps${i}`]);
         const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
         syncChartScales(epsVCharts, extremes.eps_v, 0);
@@ -636,6 +659,7 @@ function connectSSE() {
         for(let i=1; i<=3; i++) {
             updateSparklineAnnotations(charts[`chart-v-l${i}`], extremes.grid_v[i-1].min, extremes.grid_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-l${i}`], extremes.grid_c[i-1].min, extremes.grid_c[i-1].max, COLORS[`l${i}`]);
+            updateSparklineAnnotations(charts[`chart-v-ll${i}`], extremes.grid_ll[i-1].min, extremes.grid_ll[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }

@@ -481,6 +481,11 @@ class GrowattVppDriver(GrowattBaseDriver):
         reading.grid_l2_a = _s16(s2[10]) / 10.0    # 31110
         reading.grid_l3_a = _s16(s2[11]) / 10.0    # 31111
 
+        # L-L voltages (VPP 31106-31108): always store directly, RS/ST/TR naming.
+        reading.grid_ll_rs_v = _u16(s2[6]) / 10.0   # 31106 RS
+        reading.grid_ll_st_v = _u16(s2[7]) / 10.0   # 31107 ST
+        reading.grid_ll_tr_v = _u16(s2[8]) / 10.0   # 31108 TR
+
         # Grid L-N voltages: read directly from Protocol II registers 3026/3030/3034 (S0).
         # The VPP spec only provides L-L values (31106-31108); those cannot be reliably
         # converted to individual L-N voltages for a potentially unbalanced system.
@@ -491,10 +496,9 @@ class GrowattVppDriver(GrowattBaseDriver):
             reading.grid_l3_v = _u16(s0[8]) / 10.0   # 3034 L3-N (0.1V)
         else:
             logger.warning("growatt_vpp: S0 unavailable — deriving L-N from L-L via phasor triangle")
-            v_rs = _u16(s2[6]) / 10.0   # 31106 L-L AB
-            v_st = _u16(s2[7]) / 10.0   # 31107 L-L BC
-            v_tr = _u16(s2[8]) / 10.0   # 31108 L-L CA
-            reading.grid_l1_v, reading.grid_l2_v, reading.grid_l3_v = _ll_to_ln(v_rs, v_st, v_tr)
+            reading.grid_l1_v, reading.grid_l2_v, reading.grid_l3_v = _ll_to_ln(
+                reading.grid_ll_rs_v, reading.grid_ll_st_v, reading.grid_ll_tr_v
+            )
 
         # VPP meter power: pos=import from grid → invert for GrowattReading (pos=export)
         # Grid power: inverter AC output at 31100-31101 (pos = export to grid).
