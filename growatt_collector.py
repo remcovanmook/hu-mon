@@ -174,17 +174,15 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             # Segment 4 contains Temp, EPS and Meter. Starts at 3110.
             reg4 = r4.registers if len(r4.registers) >= 45 else [0]*45
             
-            # 3118 is reg4[8]
-            reading.eps_l1_v = parse_u16(reg4[8]) / 10.0
-            
             # 3121 is reg4[11]
             reading.meter_total_w = parse_s32(reg4[11], reg4[12]) / 10.0
             
-            # 3130 is reg4[20]
-            reading.eps_l2_v = parse_u16(reg4[20]) / 10.0
+            # EPS V/A Block is contiguous from 3130 to 3135
+            reading.eps_l1_v = parse_u16(reg4[20]) / 10.0  # 3130
             reading.eps_l1_a = parse_u16(reg4[21]) / 10.0  # 3131
-            reading.eps_l3_v = parse_u16(reg4[22]) / 10.0  # 3132
+            reading.eps_l2_v = parse_u16(reg4[22]) / 10.0  # 3132
             reading.eps_l2_a = parse_u16(reg4[23]) / 10.0  # 3133
+            reading.eps_l3_v = parse_u16(reg4[24]) / 10.0  # 3134
             reading.eps_l3_a = parse_u16(reg4[25]) / 10.0  # 3135
             reading.meter_l1_w = parse_s32(reg4[13], reg4[14]) / 10.0
             reading.meter_l2_w = parse_s32(reg4[15], reg4[16]) / 10.0

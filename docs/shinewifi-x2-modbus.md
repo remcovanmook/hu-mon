@@ -71,14 +71,15 @@ These registers are Read-Only and provide real-time telemetry.
 | 04 (Input) | 3125-26 | Meter L2 P | S32 | W | 0.1 | Phase 2 Net Power |
 | 04 (Input) | 3127-28 | Meter L3 P | S32 | W | 0.1 | Phase 3 Net Power |
 | **EPS (BACKUP)** | | | | | | |
-| 04 (Input) | 3118 | EPS V L1 | U16 | V | 0.1 | Backup Voltage Phase 1 |
-| 04 (Input) | 3130 | EPS V L2 | U16 | V | 0.1 | Backup Voltage Phase 2 |
-| 04 (Input) | 3132 | EPS V L3 | U16 | V | 0.1 | Backup Voltage Phase 3 |
-| 04 (Input) | 3120-21 | EPS Total P | U32 | W | 0.1 | Total Power on Backup port |
+| 04 (Input) | 3130 | EPS V L1 | U16 | V | 0.1 | Backup Voltage Phase 1 |
+| 04 (Input) | 3131 | EPS I L1 | U16 | A | 0.1 | Backup Current Phase 1 |
+| 04 (Input) | 3132 | EPS V L2 | U16 | V | 0.1 | Backup Voltage Phase 2 |
+| 04 (Input) | 3133 | EPS I L2 | U16 | A | 0.1 | Backup Current Phase 2 |
+| 04 (Input) | 3134 | EPS V L3 | U16 | V | 0.1 | Backup Voltage Phase 3 |
+| 04 (Input) | 3135 | EPS I L3 | U16 | A | 0.1 | Backup Current Phase 3 |
 | 04 (Input) | 3136-37 | EPS L1 P | U32 | W | 0.1 | Phase 1 Backup Watts |
 | 04 (Input) | 3138-39 | EPS L2 P | U32 | W | 0.1 | Phase 2 Backup Watts |
 | 04 (Input) | 3140-41 | EPS L3 P | U32 | W | 0.1 | Phase 3 Backup Watts |
-| 04 (Input) | 3131/33/35 | EPS I L1/2/3 | U16×3 | A | 0.1 | Current per Phase on EPS |
 | **BATTERY APX (HOLDING REGISTERS)** | | | | | | |
 | 03 (Hold) | 1001 | Battery Type | U16 | — | 1 | 1: Lithium (APX) |
 | 03 (Hold) | 1002 | Design Capacity | U16 | Ah | 1 | Nominal capacity in Amp-hours |
