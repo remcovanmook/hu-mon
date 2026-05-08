@@ -152,14 +152,32 @@ These registers are Read-Only and provide real-time telemetry.
 ---
 
 
-## 4. Status and Error Decoding
-### Inverter Status (Reg 3000)
+## 5. Device Identification & Status
+### Algorithmic Model Decoding (Holding Reg 28-29)
+The inverter's exact model name and power rating are not stored as ASCII. Instead, they are algorithmically encoded in a 32-bit integer spread across Holding Registers `28` and `29` (Function Code 03):
+1. Compute `module_id = (Reg[28] << 16) | Reg[29]`
+2. Extract the Series Code (Upper 16 bits): `series_code = (module_id >> 16) & 0xFFFF`
+3. Extract the Power Rating (Lower 16 bits): `power_watts = module_id & 0xFFFF`
+
+**Known Series Codes:**
+* `0x05`: MIN
+* `0x0B`: MOD
+* `0x0C`: MID
+* `0x0D`: SPH
+* `0x0E`: SPA
+* `0x0F`: MIC
+* `0x10`: MAC
+* `0x11`: MAX
+
+*(Example: If `module_id` evaluates to Series `0x0B` and Power `12000`, the model is `MOD 12KTL3-HU`.)*
+
+### Inverter Status (Input Reg 3000)
 * **0**: Waiting (Startup or low light)
 * **1**: Normal (Generating or Battery active)
 * **3**: Fault (Red LED active, system halted)
 * **4**: Flash (Firmware updating)
 
-### Fault Codes (Reg 3091)
+### Fault Codes (Input Reg 3091)
 * **201**: Leakage current too high
 * **202**: DC Isolation error
 * **300**: Grid AC voltage out of range
@@ -167,7 +185,7 @@ These registers are Read-Only and provide real-time telemetry.
 
 ---
 
-## 5. Interaction Sequence (Polling Strategy)
+## 6. Interaction Sequence (Polling Strategy)
 Due to the memory constraints of the ESP32 in the ShineWifi-X2, the following interaction sequence is required for stability:
 
 1.  **Open Connection**: Establish Modbus TCP on 5020.
@@ -182,7 +200,7 @@ Due to the memory constraints of the ESP32 in the ShineWifi-X2, the following in
     * Apply scaling.
 8.  **Close or Idle**: Either close the socket or wait `5 seconds` before the next cycle.
 
-## 6. Known Constraints
+## 7. Known Constraints
 * **Max Register Read**: Do not exceed **64 registers** per single Modbus request.
 * **Concurrent Connections**: The ShineWifi-X2 generally supports only **one** concurrent TCP connection on 5020. If multiple clients connect, the datalogger often reboots.
 * **Night Mode**: When PV voltage is zero, some registers may hold their "Last Known Good" value or revert to `0xFFFF` ($65535$). The API must filter these.
