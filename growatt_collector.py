@@ -177,8 +177,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             # 3118 is reg4[8]
             reading.eps_l1_v = parse_u16(reg4[8]) / 10.0
             
-            # 3120 is reg4[10]
-            reading.eps_p = parse_u32(reg4[10], reg4[11]) / 10.0
+            # 3121 is reg4[11]
             reading.meter_total_w = parse_s32(reg4[11], reg4[12]) / 10.0
             
             # 3130 is reg4[20]
@@ -190,6 +189,9 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
             reading.meter_l1_w = parse_s32(reg4[13], reg4[14]) / 10.0
             reading.meter_l2_w = parse_s32(reg4[15], reg4[16]) / 10.0
             reading.meter_l3_w = parse_s32(reg4[17], reg4[18]) / 10.0
+            
+            # Calculate total EPS power mathematically
+            reading.eps_p = (reading.eps_l1_v * reading.eps_l1_a) + (reading.eps_l2_v * reading.eps_l2_a) + (reading.eps_l3_v * reading.eps_l3_a)
             
             reading.bat_soc = parse_u16(reg3[0])
             reading.bat_v = parse_u16(reg3[1]) / 10.0
