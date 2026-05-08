@@ -505,22 +505,52 @@ Source: Growatt Inverter Modbus RTU Protocol II V1.39. All registers accessible 
 |---|---|---|---|---|
 | 125–127 | Inverter type | R | ASCII×3 | 6-char model type code |
 
-### TL-X / TL-XH Extended Holding Block (FC03 3000–3083)
+### TL-X / TL-XH Extended Holding Block (FC03 3000–3124)
 
-Present on MOD, MID, MIN-X, MIC-X, and similar TL-X/XH variants.
+Present on MOD, MID, MIN-X, MIC-X, and all modern TL-X/XH variants. The proxy reads this as a single 125-register chunk (3000–3124). Registers 3084–3124 are reserved in Protocol II V1.39.
+
+Source: Growatt Modbus RTU Protocol II V1.39.
 
 | Address | Name | R/W | Type | Scale | Notes |
 |---|---|---|---|---|---|
+| 3000 | Export limit failed power rate | RW | U16 | 0.1 % | Power rate applied when export limit fails |
 | 3001–15 | Serial number (new) | R | ASCII×15 | — | 30-char serial; supersedes FC03 23–27 |
-| 3018 | Work mode | RW | U16 | — | 0=load first, 1=PV first, 2=bat first, 3=grid first |
+| 3016 | Dry contact rate | RW | U16 | 0.1 % | Power rate at dry contact ON |
+| 3017 | Dry contact off rate | RW | U16 | 0.1 % | Power rate at dry contact OFF |
+| 3018 | Work mode | RW | U16 | — | 0=default, 1=PV-first, 2=Bat-first, 3=Grid-first |
 | 3023 | Grid type | RW | U16 | — | 0=single phase, 1=three phase |
 | 3025 | Battery low warning voltage | RW | U16 | 0.1 V | |
-| 3027 | Battery cut-off voltage | RW | U16 | 0.1 V | |
+| 3026 | Battery low warning clear voltage | RW | U16 | 0.1 V | |
+| 3027 | Battery cut-off voltage | RW | U16 | 0.1 V | Force stop discharge below this |
+| 3028 | Battery over-charge voltage | RW | U16 | 0.1 V | |
+| 3029 | Battery start discharge voltage | RW | U16 | 0.1 V | |
+| 3030 | Battery voltage | RW | U16 | 0.1 V | Current measured voltage |
+| 3031 | Battery temp lower limit | RW | U16 | 0.1 °C | |
+| 3032 | Battery temp upper limit | RW | U16 | 0.1 °C | |
+| 3033 | Battery temp lower clear | RW | U16 | 0.1 °C | |
 | 3036 | Grid-first discharge power rate | RW | U16 | 0.1 % | |
 | 3037 | Grid-first stop SOC | RW | U16 | 1 % | |
+| 3038 | AC charge enable time 1 | RW | U16 | — | Time-period charge/discharge schedule |
+| 3040 | AC charge enable time 2 | RW | U16 | — | |
+| 3044 | Time 4 (XH) | RW | U16 | — | XH model time period |
+| 3046 | Inverter HW version (US) | RW | U16 | — | |
 | 3047 | Battery-first charge power rate | RW | U16 | 0.1 % | |
 | 3048 | Battery-first stop SOC | RW | U16 | 1 % | |
 | 3049 | AC charge enable | RW | U16 | — | 0=off, 1=on |
+| 3050 | Time 5 (XH) | RW | U16 | — | XH model time period |
+| 3052 | Time 6 (XH) | RW | U16 | — | |
+| 3054 | Time 7 (XH) | RW | U16 | — | |
+| 3056 | Time 8 (XH) | RW | U16 | — | |
+| 3067 | On-grid grid-first stop SOC | RW | U16 | 1 % | |
+| 3070 | Battery type (buck-boost) | RW | U16 | — | |
+| 3071 | Battery module serial/parallel count | RW | U16 | — | |
+| 3072 | Disable AC charge function | RW | U16 | — | |
+| 3073 | Battery charge from generator enable | RW | U16 | — | |
+| 3074 | Force generator on | RW | U16 | — | |
+| 3077 | Generator rated power | RW | U16 | 1 W | US model |
+| 3082 | Backup box enable | RW | U16 | — | XH model |
+| 3083 | Australian region parameter | RW | U16 | — | XH model |
+| 3084–3124 | Reserved | — | — | — | Not defined in V1.39 |
 
 ---
 
