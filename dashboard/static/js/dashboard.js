@@ -82,6 +82,12 @@ let lastStatus = null;
 const charts = {};
 const maxPoints = 60;
 const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
+const FAULT_MAP = {
+    201: "Leakage current too high",
+    202: "DC Isolation error",
+    300: "Grid AC voltage out of range",
+    302: "Grid frequency out of range"
+};
 
 function chartPalette() {
   const s = getComputedStyle(document.documentElement);
@@ -520,7 +526,16 @@ function connectSSE() {
         updateDOM("meta-e-today", d.pv_today_kwh.toFixed(1) + " kWh");
         updateDOM("meta-e-total", d.pv_total_kwh.toFixed(1) + " kWh");
         updateDOM("meta-temp", (d.inverter_temp !== undefined ? d.inverter_temp.toFixed(1) + " °C" : "—"));
-        updateDOM("meta-fault", (d.fault_code !== undefined ? d.fault_code : "—"));
+        
+        let faultStr = "—";
+        if (d.fault_code !== undefined) {
+            if (d.fault_code === 0) {
+                faultStr = "0 -- None";
+            } else {
+                faultStr = `${d.fault_code} -- ${FAULT_MAP[d.fault_code] || "Unknown Fault"}`;
+            }
+        }
+        updateDOM("meta-fault", faultStr);
 
         const flooredMin = Date.now() - currentHours * 3600000;
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
