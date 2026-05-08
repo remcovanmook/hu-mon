@@ -52,6 +52,31 @@ Try to read the largest contiguous FC03 block starting at 0, using chunk sizes i
 
 Result is stored in the probe context as `holding_block` (125 registers, FC03 0–124).
 
+### Stage 3a — Topology Register (FC03 44, universal)
+
+Register 44 is present in **all** Growatt Protocol I, Protocol II, and VPP devices. It is the most reliable single-register topology identifier because it does not require a VPP DTC lookup or any cross-reference table.
+
+| Bits | Content |
+|---|---|
+| 15–8 (high byte) | PV string input count tracked by the firmware |
+| 7–0 (low byte) | AC phase count (1 = single phase, 3 = three phase) |
+
+Examples:
+
+| TP value | Hex | PV strings | Phases | Typical device |
+|---|---|---|---|---|
+| 0x0101 | 257 | 1 | 1 | MIC 600–3300TL |
+| 0x0401 | 1025 | 4 | 1 | MIN / SPH single phase |
+| 0x0403 | 1027 | 4 | 3 | MOD/MID-XH, 4-string 3-phase |
+| 0x0803 | 2051 | 8 | 3 | MOD/MID-HU, 8-string inputs (4 MPPTs × 2 strings) |
+| 0x1003 | 4099 | 16 | 3 | MID/MAC large commercial |
+
+This register is read as part of `holding_block` (Stage 3) and requires no additional read. The probe pipeline extracts it explicitly because it **overrides** any phase count inferred from the DTC table — the hardware topology reported by the firmware is authoritative.
+
+```
+FC03 44 = 0x0803  →  8 PV string inputs, 3 AC phases
+```
+
 ### Stage 3b — Protocol II Identity (FC04 3000–3029)
 
 Read 30 FC04 input registers starting at 3000. Used to confirm the device is a Growatt: `reg[0]` (status) must be in the valid range 0–10.
@@ -62,16 +87,19 @@ Read 30 FC04 input registers starting at 3000. Used to confirm the device is a G
 
 ### Stage 3c — VPP DTC and Protocol Version (FC03 30000–30099)
 
-Read 100 FC03 registers starting at 30000 (the VPP Basic Parameter block).
+Read 100 FC03 registers starting at 30000 (the VPP Basic Parameter block). This step is VPP-specific; non-VPP Protocol II devices will return an exception code here, which is handled gracefully.
 
 - **reg[0]** = DTC code (e.g. 5401)
 - **reg[99]** = VPP protocol version (e.g. 202 = V2.02)
 
-A version in the range 200–299 confirms VPP capability. The DTC is looked up in the DTC table (Section 6) to determine family, phase count, EPS presence, and register profile.
+A version in the range 200–299 confirms VPP capability. The DTC is looked up in the DTC table (Section 6) to determine family, EPS presence, and register profile. Phase count from the DTC table is treated as a **fallback only** — the value from FC03 44 (Stage 3a) takes precedence.
+
+If FC03 30000–3099 returns an exception, the device is Protocol II only (no VPP). The `GrowattModHuDriver` fallback handles this case using the holding block and FC04 3000+ data.
 
 ```
-→ FC03 addr=30000 count=100  → DTC=5401 (MOD/MID-HU, 3-phase, EPS)
+→ FC03 addr=30000 count=100  → DTC=5401 (MOD/MID-HU, EPS, profile=BASE_PROTO_II_VPP)
                                VPP version=202 (V2.02)
+                               Phase count from TP reg: 3 (authoritative)
 ```
 
 ### Stage 4 — Driver Selection
@@ -85,15 +113,20 @@ Iterates the driver registry in priority order. The first driver whose `probe()`
 
 After driver selection, `read_device_info()` is called once:
 
-1. **FC03 30000–30099** — full VPP parameter block (DTC, model, serial, rated power, VPP version)
-2. **FC03 30001–30015** — serial number string (ASCII)
+1. **FC03 30000–30099** — full VPP parameter block (DTC, model, serial, rated power, VPP version) — VPP only
+2. **FC03 30001–30015** — serial number string (ASCII) — VPP only
 3. **FC03 9–14** — DSP firmware string
-4. **FC03 44** — TP register (PV string count / phase count); overrides DTC-inferred phases
-5. **FC03 0–124** — full base holding block; seeded into static register cache
+4. **FC03 44** — already in `holding_block`; re-extracted here to confirm phase and PV string count
+5. **FC03 0–124** — full base holding block seeded into static register cache
 6. **FC03 1001** — battery type (SPH/SPA/HU only)
 7. **FC03 1005** — battery nominal capacity (SPH/SPA/HU only)
 
 The static cache is served by the proxy for all subsequent FC03 reads in those ranges. No re-read on reconnect.
+
+**Phase count resolution order** (highest priority first):
+1. FC03 44 low byte (hardware-reported, authoritative)
+2. DTC table entry (software lookup, fallback)
+3. Default = 3 (last resort for unknown DTC)
 
 ---
 
