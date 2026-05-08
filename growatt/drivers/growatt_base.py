@@ -129,10 +129,9 @@ class GrowattBaseDriver(BaseDriver):
         """
         Vendor-level heuristic: does the ProbeContext look like a Growatt?
 
-        Uses ctx.input_block (FC 04, registers 3000-3029), which the
-        ShineWifi-X2 bridges directly to the inverter.  FC 03 holding
-        registers 0-124 belong to the ShineWifi itself and cannot be used
-        for inverter identification.
+        Uses ctx.input_block (FC 04, registers 3000-3029) for identification.
+        FC 03 holding registers 0-124 are also inverter registers but the
+        status register is only available via FC 04.
 
         The check: FC 04 responded (input_block is not None) AND the status
         register at 3000 (input_block[0]) is in the Protocol II defined range

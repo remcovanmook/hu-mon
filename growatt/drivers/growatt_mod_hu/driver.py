@@ -185,16 +185,12 @@ class GrowattModHuDriver(GrowattBaseDriver):
 
         No additional Modbus reads are performed.
         """
-        # The ShineWifi-X2 FC 03 holding registers 0-124 are the ShineWifi's
-        # own config space, not the inverter's Protocol II holding space.
-        # Series-code identification via holding block is not possible here.
-        #
-        # Fallback: confirm that FC 04 input registers at 3000 are accessible
-        # (already verified in _is_growatt) and that the status value is in
-        # the normal operating range.  A more specific series check requires
-        # the ShineWifi to bridge VPP holding registers (30000+) or a
-        # hardware-side Protocol II holding register read, which the ShineWifi
-        # does not appear to support.
+        # Identification from FC03 holding registers is unreliable on this
+        # hardware: regs 28-29 (module_id) and reg 121 (device_type) read as
+        # 0 and 120 respectively — the inverter does not populate those FC03
+        # addresses.  VPP registers (FC03 30000+) are not present on this variant.
+        # Fall back to confirming FC04 input registers are accessible and that
+        # the status value is in the normal operating range.
         if ctx.input_block is None:
             logger.info("_probe_series: input_block is None")
             return False
@@ -210,25 +206,25 @@ class GrowattModHuDriver(GrowattBaseDriver):
 
         Each register read is attempted independently.  A failure on any one
         read is logged and a safe default is used rather than aborting startup.
-        This is necessary because the ShineWifi-X2 FC03 holding registers
-        0-124 are the ShineWifi's own config space (not the inverter's), so
-        module_id (regs 28-29) and device_type (reg 121) cannot be read from
-        the standard Protocol II path on this hardware.
+
+        FC03 regs 28-29 (module_id) and reg 121 (device_type) read as 0 / 120
+        on this hardware — the inverter does not populate those addresses.  The
+        model string is derived from module_id where non-zero; otherwise falls
+        back to a generic label.
 
         Reads attempted:
-        - FC03 0-124:   Firmware string at regs 9-14.
-        - FC03 3001-15: 30-char serial (outside ShineWifi own space; bridges
-                        to inverter on most firmware versions).
+        - FC03 0-124:   Firmware string at regs 9-14, module_id at 28-29.
+        - FC03 3001-15: 30-char inverter serial.
         - FC03 1001:    Battery type.
         - FC03 1005:    Battery nominal energy.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
         """
-        # ShineWifi base block (FC03 0-124).
-        # Contains ShineWifi config.  Firmware string at regs 9-14 is correct
-        # (ShineWifi mirrors it).  module_id at regs 28-29 is zero on our
-        # hardware — the ShineWifi does not bridge those addresses.
+        # Inverter FC03 holding registers 0-124, accessed via the ShineWifi
+        # transparent gateway.  Firmware string at regs 9-14, device_type at
+        # reg 0, module_id at regs 28-29 (zero on this hardware — inverter
+        # does not populate those addresses in the FC03 non-VPP space).
         firmware = "unknown"
         module_id = 0
         device_type = 0
@@ -250,14 +246,13 @@ class GrowattModHuDriver(GrowattBaseDriver):
                 model, rated_w = "Unknown Growatt Hybrid 3ph", 0
         else:
             logger.warning(
-                "read_device_info: module_id at FC03 regs 28-29 is zero "
-                "(ShineWifi does not bridge Protocol II holding registers at these "
-                "addresses). Model and rated power will be reported as unknown."
+                "read_device_info: module_id at FC03 regs 28-29 is zero — "
+                "inverter does not populate these addresses. "
+                "Model and rated power will be reported as unknown."
             )
             model, rated_w = "Unknown Growatt Hybrid 3ph", 0
 
         # Serial number (FC03 3001-3015).
-        # Outside the ShineWifi's own 0-124 range; typically bridges to inverter.
         serial = "unknown"
         r_serial = client.read_holding_registers(3001, count=15, device_id=slave_id)
         if not r_serial.isError():

@@ -12,13 +12,14 @@ Stage 2 — Function code support
     Tests FC 03 (holding) and FC 04 (input) individually.  Records which
     codes are available; drivers that require an absent FC are skipped.
 
-Stage 3 — ShineWifi holding block (FC 03, 0–124)
-    Contains ShineWifi-X2 own registers (firmware, config, timestamp).
-    Not used for inverter identity but cached for proxy consumers.
+Stage 3 — Inverter holding block (FC 03, 0–124)
+    Inverter FC03 holding registers accessed directly via the RS485-to-TCP
+    gateway.  Cached for drivers that read firmware / device_type from this
+    range; not used for primary VPP identification.
 
 Stage 3b — Inverter input block (FC 04, 3000–3029)
-    ShineWifi bridges these to the actual inverter. Used by GrowattBaseDriver
-    to confirm vendor identity via the Protocol II status register.
+    Inverter FC04 input registers (Protocol II address space).  Used by
+    GrowattBaseDriver to confirm vendor identity via the status register.
 
 Stage 3c — VPP DTC + Protocol Version (FC 03, 30000 + 30099)
     Reads the full 100-register Basic Parameter block.  DTC from 30000 is
@@ -194,17 +195,15 @@ def auto_select(
     supported_fcs = _detect_function_codes(client, slave_id)
     logger.info("Supported function codes: %s", sorted(supported_fcs))
 
-    # Stage 3: ShineWifi holding block (FC 03, 0–124).
-    # Note: on ShineWifi-X2 hardware, FC 03 registers 0-124 belong to the
-    # ShineWifi itself, NOT the inverter.  The block is retained for future
-    # use (e.g. reading ShineWifi config) but is NOT used for inverter identity.
+    # Stage 3: Inverter FC03 holding block (0-124).
+    # All FC03 reads go directly to the inverter via the RS485-to-TCP gateway.
+    # Cached for drivers that need firmware / device_type from this range.
     holding_block, max_block_size = None, 0
     if 3 in supported_fcs:
         holding_block, max_block_size = _read_holding_block(client, slave_id)
 
-    # Stage 3b: Inverter input block (FC 04, Protocol II address space).
-    # The ShineWifi-X2 bridges FC 04 input registers to the actual inverter.
-    # 30 registers at 3000 are enough for status + PV identification.
+    # Stage 3b: Inverter FC04 input block (Protocol II, 3000-3029).
+    # 30 registers are enough for status + PV identification.
     input_block = None
     if 4 in supported_fcs:
         try:
@@ -239,6 +238,11 @@ def auto_select(
                     logger.info("VPP Protocol Version: %d (V%d.%02d)", ver, ver // 100, ver % 100)
                 else:
                     logger.debug("VPP 30099=%d — not a plausible VPP version", ver)
+                non_zero_vpp = {30000 + i: v for i, v in enumerate(r.registers) if v != 0}
+                logger.info(
+                    "VPP block 30000-30099 non-zero: %s",
+                    {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero_vpp.items())},
+                )
             else:
                 logger.debug("VPP block 30000-30099 returned error")
         except Exception as exc:

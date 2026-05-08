@@ -7,7 +7,7 @@ VPP Protocol V2.01 or later (identified via DTC at FC 03 register 30000).
 Primary register source: VPP (FC03 30000+, FC04 31000+).
 Protocol II FC04 supplements: per-phase L-N voltages (3026-3035),
 PV energy + boost temp (3049-3095), EPS data (3130-3159).
-FC03 0-124 is the ShineWifi's own space and is not used for inverter data.
+FC03 0-124 holds inverter configuration registers (firmware, device_type, etc.)
 
 Poll segments
 -------------
@@ -274,7 +274,7 @@ class GrowattVppDriver(GrowattBaseDriver):
             30016-30017     Rated power Pn (0.1 W)
             30060-30061     Inverter type-model chars (ASCII, e.g. "TL" + "AA")
             30099           VPP protocol version (201 = V2.01, 202 = V2.02 …)
-          FC03 9-14         Firmware string (ShineWifi mirrors DSP fw here)
+          FC03 9-14         Firmware string (inverter FC03 holding register)
           FC03 1001         Battery type (0=none, 1=Li-ion)
           FC03 1005         Battery nominal capacity (0.1 kWh)
 
@@ -347,7 +347,8 @@ class GrowattVppDriver(GrowattBaseDriver):
         except Exception as exc:
             logger.warning("read_device_info: serial exception: %s", exc)
 
-        # Firmware string (FC03 9-14; ShineWifi mirrors inverter DSP version)
+        # Firmware string at FC03 9-14 — inverter holding register, accessed
+        # directly via the ShineWifi gateway (transparent Modbus TCP proxy).
         firmware = ""
         try:
             r = client.read_holding_registers(9, count=6, device_id=slave_id)
