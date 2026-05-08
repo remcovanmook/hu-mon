@@ -134,7 +134,7 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     5200: _DtcEntry("MIC", False, 1),   # MIC/MIN 2500-6000TL-X/X2  (1-phase, no EPS)
     5201: _DtcEntry("MIN", False, 1),   # MIN 7000-10000TL-X/X2     (1-phase, no EPS; 01≠hybrid here)
     5400: _DtcEntry("MOD", False, 3),   # MOD-XH / MID-XH           (3-phase, no EPS)
-    5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU                (3-phase, EPS; confirmed live)
+    5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU  (3-phase, EPS; confirmed live: 12KTL3-HU, VPP V2.02)
     5601: _DtcEntry("WIT", True,  3),   # WIT 100KTL3-H             (3-phase, EPS)
     5800: _DtcEntry("WIS", False, 3),   # WIS 215KTL3               (3-phase, no EPS)
 }
@@ -202,7 +202,10 @@ class GrowattVppDriver(GrowattBaseDriver):
     def __init__(self) -> None:
         self._dtc_entry: Optional[_DtcEntry] = None
         self._has_eps: bool = False
-        self._vpp_protocol_version: int = 0   # from FC03 30099; 0 = unknown
+        self._vpp_protocol_version: int = 0
+        # Populated by read_device_info from FC03 30099.
+        # 201 = V2.01 (spec doc version), 202 = V2.02 (seen on MOD 12KTL3-HU).
+        # Use this to gate register-map differences between protocol generations.
 
     @property
     def driver_id(self) -> str:
@@ -291,8 +294,10 @@ class GrowattVppDriver(GrowattBaseDriver):
                 pn_raw = _u32(r.registers[16], r.registers[17])
                 rated_w = int(pn_raw / 10.0)
 
-                # 30060-30061: hardware model-type chars (e.g. 'TL' + 'AA')
-                # Each register encodes two ASCII chars (high byte, low byte).
+                # 30060-30061: DSP firmware model code (2×ASCII, high+low byte per reg).
+                # e.g. 'DO'+'AA' on MOD 12KTL3-HU running DO1.0.  This is the internal
+                # DSP version name, *not* the inverter topology suffix ('TL'/'KTL').
+                # The topology comes from _build_model_string via the DTC entry.
                 def _ascii2(reg: int) -> str:
                     hi, lo = (reg >> 8) & 0xFF, reg & 0xFF
                     return "".join(chr(b) if 32 <= b < 127 else "" for b in (hi, lo))
