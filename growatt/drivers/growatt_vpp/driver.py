@@ -117,14 +117,19 @@ class _DtcEntry:
 
 _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     # Source: VPP Communication Protocol V2.01, Table 3-1
-    # has_eps=True for -HU and BH-UP variants (EPS/backup output present).
+    #
+    # Encoding convention (5xxx family):
+    #   last two digits == 00  →  XH variant  (no EPS / battery)
+    #   last two digits == 01  →  HU variant  (has EPS / battery)
+    # Exceptions: 5200/5201 use the last digit for power-range, not EPS;
+    #             3xxx codes use a different family-encoding scheme.
     3502: _DtcEntry("SPH", False, 1),   # SPH 3000-6000TL BL       (1-phase, no EPS)
     3601: _DtcEntry("SPH", True,  3),   # SPH 4000-10000TL3 BH-UP  (3-phase, EPS)
     3725: _DtcEntry("SPA", True,  3),   # SPA 4000-10000TL3 BH-UP  (3-phase, EPS)
     3735: _DtcEntry("SPA", False, 1),   # SPA 3000-6000TL BL        (1-phase, no EPS)
     5100: _DtcEntry("MIN", False, 1),   # MIN 2500-6000TL-XH/XH(P)  (1-phase, no EPS)
     5200: _DtcEntry("MIC", False, 1),   # MIC/MIN 2500-6000TL-X/X2  (1-phase, no EPS)
-    5201: _DtcEntry("MIN", False, 1),   # MIN 7000-10000TL-X/X2     (1-phase, no EPS)
+    5201: _DtcEntry("MIN", False, 1),   # MIN 7000-10000TL-X/X2     (1-phase, no EPS; 01≠hybrid here)
     5400: _DtcEntry("MOD", False, 3),   # MOD-XH / MID-XH           (3-phase, no EPS)
     5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU                (3-phase, EPS; confirmed live)
     5601: _DtcEntry("WIT", True,  3),   # WIT 100KTL3-H             (3-phase, EPS)
@@ -133,6 +138,24 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
 
 # DTCs for which battery registers (31200-31599) are not applicable.
 _VPP_DTC_NO_BATTERY: frozenset = frozenset({5201, 5200})
+
+
+def _dtc_infer_entry(dtc: int) -> _DtcEntry:
+    """
+    Best-effort inference of DTC metadata for codes not in _VPP_DTC_TABLE.
+
+    Uses the observed encoding convention for the 5xxx family:
+      last two digits == 01  →  hybrid (has_eps=True)
+      last two digits == 00  →  non-hybrid (has_eps=False)
+    Phases default to 3 (safer; extra register reads cost little).
+    Series is marked "UNK" so callers can detect the fallback path.
+
+    :param dtc: Raw DTC value from VPP register 30000.
+    :returns:   Inferred _DtcEntry.
+    """
+    has_eps = (dtc % 100 == 1)
+    return _DtcEntry("UNK", has_eps, 3)
+
 
 
 def _build_model_string(entry: _DtcEntry, rated_w: int) -> str:
@@ -188,11 +211,13 @@ class GrowattVppDriver(GrowattBaseDriver):
 
     def _probe_series(self, ctx: ProbeContext) -> bool:
         """
-        VPP series check: succeeds when ``ctx.vpp_dtc`` is a known DTC.
+        VPP series check: succeeds when ``ctx.vpp_dtc`` is a recognised DTC
+        or can be inferred via the xx00/xx01 EPS-encoding convention.
 
         Called only if ``_is_growatt()`` returned True (Protocol II status
-        register confirms vendor identity).  A non-None, recognised DTC at
-        FC03 30000 uniquely identifies a VPP-capable Growatt inverter.
+        register confirms vendor identity).  A non-None DTC at FC03 30000
+        is sufficient to confirm VPP capability; unknown codes fall back to
+        :func:`_dtc_infer_entry` so new hardware is not silently rejected.
 
         :param ctx: ProbeContext populated by registry Stages 1-3c.
         :returns:   True if this is a VPP-capable Growatt inverter.
@@ -202,15 +227,17 @@ class GrowattVppDriver(GrowattBaseDriver):
             return False
         entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc)
         if entry is None:
-            logger.info(
-                "growatt_vpp: DTC 0x%04X (%d) not in VPP table",
-                ctx.vpp_dtc, ctx.vpp_dtc,
+            entry = _dtc_infer_entry(ctx.vpp_dtc)
+            logger.warning(
+                "growatt_vpp: DTC 0x%04X (%d) not in table — "
+                "inferred has_eps=%s phases=%d (heuristic; add to _VPP_DTC_TABLE)",
+                ctx.vpp_dtc, ctx.vpp_dtc, entry.has_eps, entry.phases,
             )
-            return False
-        logger.info(
-            "growatt_vpp: DTC %d → %s, has_eps=%s, phases=%d",
-            ctx.vpp_dtc, entry.series, entry.has_eps, entry.phases,
-        )
+        else:
+            logger.info(
+                "growatt_vpp: DTC %d → %s, has_eps=%s, phases=%d",
+                ctx.vpp_dtc, entry.series, entry.has_eps, entry.phases,
+            )
         return True
 
     # ------------------------------------------------------------------
