@@ -14,6 +14,7 @@ from growatt.drivers.growatt_vpp.driver import (
     _DtcEntry,
     _VPP_DTC_TABLE,
     _build_model_string,
+    _ll_to_ln,
 )
 
 
@@ -51,8 +52,32 @@ def _error_response():
 
 
 # ---------------------------------------------------------------------------
-# _build_model_string
+# _ll_to_ln
 # ---------------------------------------------------------------------------
+
+class TestLlToLn(unittest.TestCase):
+
+    def test_balanced_gives_sqrt3_ratio(self):
+        """For balanced L-L voltages the L-N result must equal V_LL / √3."""
+        v_ll = 420.0
+        v_rn, v_sn, v_tn = _ll_to_ln(v_ll, v_ll, v_ll)
+        expected = v_ll / math.sqrt(3)
+        self.assertAlmostEqual(v_rn, expected, places=6)
+        self.assertAlmostEqual(v_sn, expected, places=6)
+        self.assertAlmostEqual(v_tn, expected, places=6)
+
+    def test_unbalanced_differs_from_sqrt3(self):
+        """Asymmetric L-L voltages produce asymmetric L-N voltages."""
+        v_rn, v_sn, v_tn = _ll_to_ln(430.0, 420.0, 415.0)
+        # Values should differ from each other
+        self.assertNotAlmostEqual(v_rn, v_sn, places=1)
+        self.assertNotAlmostEqual(v_sn, v_tn, places=1)
+
+    def test_invalid_triangle_raises(self):
+        """Side lengths that violate the triangle inequality must raise."""
+        with self.assertRaises(ValueError):
+            _ll_to_ln(100.0, 100.0, 300.0)
+
 
 class TestBuildModelString(unittest.TestCase):
 
@@ -323,12 +348,10 @@ class TestReadRegistersVPP(unittest.TestCase):
         self.assertAlmostEqual(r.grid_l2_v, 245.0)
         self.assertAlmostEqual(r.grid_l3_v, 246.2)
 
-    def test_grid_voltages_fallback_to_ll_sqrt3(self):
-        """When S0 fails, fall back to VPP L-L ÷ √3 (balanced-system approximation)."""
+    def test_grid_voltages_fallback_to_phasor_geometry(self):
+        """When S0 fails, L-N voltages are derived via phasor triangle geometry."""
         driver = GrowattVppDriver()
-        # Pass s0=False to signal error response (None means use default)
         client = self._make_client(s2=_make_s2(v_ab=4283, v_bc=4279, v_ca=4299))
-        # Patch 3026 to return an error
         orig = client.read_input_registers.side_effect
         def patched(addr, count, device_id):
             if addr == 3026:
@@ -336,7 +359,10 @@ class TestReadRegistersVPP(unittest.TestCase):
             return orig(addr, count, device_id)
         client.read_input_registers.side_effect = patched
         r = driver.read_registers(client, slave_id=1)
-        self.assertAlmostEqual(r.grid_l1_v, 428.3 / math.sqrt(3), places=1)
+        expected_rn, expected_sn, expected_tn = _ll_to_ln(428.3, 427.9, 429.9)
+        self.assertAlmostEqual(r.grid_l1_v, expected_rn, places=1)
+        self.assertAlmostEqual(r.grid_l2_v, expected_sn, places=1)
+        self.assertAlmostEqual(r.grid_l3_v, expected_tn, places=1)
 
     def test_per_phase_ac_power(self):
         """meter_l1_w = V_L1N (from S0) × I_A × PF."""

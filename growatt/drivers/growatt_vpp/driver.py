@@ -45,8 +45,56 @@ logger = logging.getLogger(__name__)
 # the ShineWifi-X2 single-threaded TCP stack.
 _INTER_SEGMENT_SLEEP: float = 0.05
 
-# √3 — used to convert L-L voltages to L-N for per-phase power derivation.
-_SQRT3: float = math.sqrt(3)
+
+def _ll_to_ln(v_rs: float, v_st: float, v_tr: float) -> tuple:
+    """
+    Derive per-phase L-N voltage magnitudes from the three L-L magnitudes.
+
+    The three L-N phasor tips (V_R, V_S, V_T) form a triangle whose side
+    lengths are the L-L voltages.  In a wye system the neutral lies at the
+    centroid of that triangle; each L-N voltage is the distance from its
+    vertex to the centroid.
+
+    Method:
+      1. Fix V_S at the origin and V_T on the positive x-axis.
+      2. Locate V_R using the law of cosines at vertex S.
+      3. Compute the centroid G = (V_R + V_S + V_T) / 3.
+      4. Return |V_R − G|, |V_S − G|, |V_T − G|.
+
+    Works for any triangle (balanced or unbalanced phase voltages) and
+    requires no approximation beyond the wye-with-grounded-neutral model.
+
+    :param v_rs: Line-to-line voltage magnitude RS (volts).
+    :param v_st: Line-to-line voltage magnitude ST (volts).
+    :param v_tr: Line-to-line voltage magnitude TR (volts).
+    :returns:    Tuple (v_rn, v_sn, v_tn) — L-N voltage magnitudes in volts.
+    :raises ValueError: If the three magnitudes cannot form a valid triangle.
+    """
+    # Guard: triangle inequality (any two sides must exceed the third)
+    if v_rs + v_st <= v_tr or v_st + v_tr <= v_rs or v_tr + v_rs <= v_st:
+        raise ValueError(
+            f"L-L values ({v_rs}, {v_st}, {v_tr}) do not form a valid triangle"
+        )
+
+    # Place S at origin, T on the positive x-axis
+    sx, sy = 0.0, 0.0
+    tx, ty = v_st, 0.0
+
+    # Locate R via law of cosines at vertex S (angle between sides RS and ST)
+    cos_s = (v_rs ** 2 + v_st ** 2 - v_tr ** 2) / (2.0 * v_rs * v_st)
+    sin_s = math.sqrt(max(0.0, 1.0 - cos_s ** 2))  # always take positive root
+    rx = v_rs * cos_s
+    ry = v_rs * sin_s
+
+    # Centroid = neutral point N
+    gx = (rx + sx + tx) / 3.0
+    gy = (ry + sy + ty) / 3.0
+
+    v_rn = math.sqrt((rx - gx) ** 2 + (ry - gy) ** 2)
+    v_sn = math.sqrt((sx - gx) ** 2 + (sy - gy) ** 2)
+    v_tn = math.sqrt((tx - gx) ** 2 + (ty - gy) ** 2)
+
+    return v_rn, v_sn, v_tn
 
 
 # ---------------------------------------------------------------------------
@@ -401,16 +449,17 @@ class GrowattVppDriver(GrowattBaseDriver):
         # Grid L-N voltages: read directly from Protocol II registers 3026/3030/3034 (S0).
         # The VPP spec only provides L-L values (31106-31108); those cannot be reliably
         # converted to individual L-N voltages for a potentially unbalanced system.
-        # Fall back to VPP L-L ÷ √3 only when S0 is unavailable.
+        # If S0 is unavailable, derive L-N values via phasor triangle geometry (_ll_to_ln).
         if s0:
             reading.grid_l1_v = _u16(s0[0]) / 10.0   # 3026 L1-N (0.1V)
             reading.grid_l2_v = _u16(s0[4]) / 10.0   # 3030 L2-N (0.1V)
             reading.grid_l3_v = _u16(s0[8]) / 10.0   # 3034 L3-N (0.1V)
         else:
-            logger.warning("growatt_vpp: S0 unavailable — falling back to L-L/√3 approximation")
-            reading.grid_l1_v = (_u16(s2[6]) / 10.0) / _SQRT3   # 31106 L-L AB → L-N
-            reading.grid_l2_v = (_u16(s2[7]) / 10.0) / _SQRT3   # 31107 L-L BC → L-N
-            reading.grid_l3_v = (_u16(s2[8]) / 10.0) / _SQRT3   # 31108 L-L CA → L-N
+            logger.warning("growatt_vpp: S0 unavailable — deriving L-N from L-L via phasor triangle")
+            v_rs = _u16(s2[6]) / 10.0   # 31106 L-L AB
+            v_st = _u16(s2[7]) / 10.0   # 31107 L-L BC
+            v_tr = _u16(s2[8]) / 10.0   # 31108 L-L CA
+            reading.grid_l1_v, reading.grid_l2_v, reading.grid_l3_v = _ll_to_ln(v_rs, v_st, v_tr)
 
         # VPP meter power: pos=import from grid → invert for GrowattReading (pos=export)
         reading.meter_total_w = -(_s32(s2[12], s2[13]) / 10.0)   # 31112-31113
