@@ -50,7 +50,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore, driver_id: str = No
     client.connect()
 
     logger.info("Running probe pipeline against %s:%d", ip, port)
-    driver, slave_id = auto_select(client, force_driver_id=driver_id)
+    driver, slave_id, _ctx = auto_select(client, force_driver_id=driver_id)
     logger.info("Driver: %s  Slave ID: %d", driver.driver_id, slave_id)
 
     device_info = driver.read_device_info(client, slave_id)
