@@ -144,8 +144,16 @@ class TestReadDeviceInfoVPP(unittest.TestCase):
         if fw_words is None:
             fw_words = [0x444F, 0x3131, 0x2E30, 0x5A42, 0x4443, 0]
 
-        # Build 18-register block: [dtc, ?, ...×14, rated_high, rated_low]
-        block30000 = [dtc] + [0] * 15 + [rated_high, rated_low]
+        # 100-register block: [dtc, ?, ...×14, rated_high, rated_low, ...padding...,
+        #                       type_chars_60, type_chars_61, ..., vpp_ver_99]
+        block30000 = (
+            [dtc] + [0] * 15           # [0]=DTC, [1-15]=serial placeholder
+            + [rated_high, rated_low]  # [16-17]=rated power
+            + [0] * 42                 # [18-59]=unused parameters
+            + [0x544C, 0x3300]         # [60-61]=model type chars 'TL'+'3\0'
+            + [0] * 37                 # [62-98]=version sub-blocks (not decoded yet)
+            + [201]                    # [99]=VPP protocol version (201=V2.01)
+        )
 
         client = MagicMock()
 
@@ -164,6 +172,7 @@ class TestReadDeviceInfoVPP(unittest.TestCase):
 
         client.read_holding_registers.side_effect = read_holding
         return client
+
 
     def test_model_string(self):
         client = self._make_client(dtc=5401, rated_high=1, rated_low=54464)
