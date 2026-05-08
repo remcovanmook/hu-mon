@@ -380,6 +380,28 @@ class GrowattVppDriver(GrowattBaseDriver):
             except Exception as exc:
                 logger.warning("read_device_info: bat_nominal_kwh exception: %s", exc)
 
+        # FC03 reg 44: TP — input tracker count (high byte) and AC phase count (low byte).
+        # High byte: total input count.  On MOD 12KTL3-HU this is 8 (4 MPPTs × 2 strings,
+        # or 4 PV + 4 BDC — ambiguous from the AppNote alone).
+        # Low byte: AC output phase count.  This is authoritative: no model-string inference.
+        pv_inputs = None
+        try:
+            r = client.read_holding_registers(44, count=1, device_id=slave_id)
+            if not r.isError() and r.registers[0] != 0:
+                raw_tp = r.registers[0]
+                pv_inputs = (raw_tp >> 8) & 0xFF
+                tp_phases = raw_tp & 0xFF
+                if tp_phases in (1, 3):
+                    phases = tp_phases   # override DTC-inferred value
+                logger.info(
+                    "read_device_info: TP=0x%04X — inputs=%d, phases=%d",
+                    raw_tp, pv_inputs, phases,
+                )
+            else:
+                logger.debug("read_device_info: FC03 reg 44 unavailable — keeping DTC-inferred phases=%d", phases)
+        except Exception as exc:
+            logger.warning("read_device_info: FC03 reg 44 exception: %s", exc)
+
         # Cache has_eps and VPP protocol version for use in read_registers
         self._dtc_entry = entry
         self._has_eps = has_eps
@@ -392,7 +414,7 @@ class GrowattVppDriver(GrowattBaseDriver):
             rated_power_w=rated_w,
             bat_nominal_kwh=bat_nominal_kwh,
             phases=phases,
-            pv_strings=None,
+            pv_strings=pv_inputs,
             has_eps=has_eps,
             has_battery=has_battery,
         )
