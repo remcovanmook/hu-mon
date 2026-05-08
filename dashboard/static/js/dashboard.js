@@ -81,7 +81,17 @@ let lastStatus = null;
 
 const charts = {};
 const maxPoints = 60;
-const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
+const STATUS_MAP = {
+    0: "STANDBY",
+    1: "SELF-TEST",
+    3: "FAULT",
+    4: "UPGRADE",
+    5: "NORMAL",    // PV online, battery offline
+    6: "NORMAL",    // PV + battery online
+    7: "OFF-GRID",  // PV + battery, off-grid
+    8: "OFF-GRID",  // battery only, off-grid
+    9: "BYPASS",
+};
 const FAULT_MAP = {
     101: "Communication fault (Internal)",
     116: "EEPROM fault",

@@ -297,7 +297,9 @@ class GrowattVppDriver(GrowattBaseDriver):
         Per-string PV power: computed as V × I (DC, no power factor).
         Per-phase AC power: derived as (V_LL / √3) × I × PF where
           PF = ac_active_w / |S|, using active and reactive power from S2.
-        Grid voltages: L-L (AB/BC/CA, ≈428 V on this device), not L-N.
+        Grid voltages: Derived as L-N (≈242 V) by dividing VPP L-L registers
+        (31106-31108, AB/BC/CA) by √3.  The VPP spec provides no separate L-N
+        registers for 3-phase devices.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
@@ -380,9 +382,12 @@ class GrowattVppDriver(GrowattBaseDriver):
         ac_reactive_var = _s32(s2[2], s2[3]) / 10.0   # 31102-31103
 
         reading.grid_freq = _u16(s2[5])  / 100.0   # 31105
-        reading.grid_l1_v = _u16(s2[6])  / 10.0    # 31106  L-L voltage AB
-        reading.grid_l2_v = _u16(s2[7])  / 10.0    # 31107  L-L voltage BC
-        reading.grid_l3_v = _u16(s2[8])  / 10.0    # 31108  L-L voltage CA
+        # 31106-31108 give L-L voltages (AB/BC/CA ≈420 V on a 240 V TN network).
+        # The VPP spec has no separate L-N registers for 3-phase devices;
+        # divide by √3 to derive the L-N value (~242 V).
+        reading.grid_l1_v = (_u16(s2[6])  / 10.0) / _SQRT3  # 31106 L-L AB → L-N
+        reading.grid_l2_v = (_u16(s2[7])  / 10.0) / _SQRT3  # 31107 L-L BC → L-N
+        reading.grid_l3_v = (_u16(s2[8])  / 10.0) / _SQRT3  # 31108 L-L CA → L-N
         reading.grid_l1_a = _s16(s2[9])  / 10.0    # 31109
         reading.grid_l2_a = _s16(s2[10]) / 10.0    # 31110
         reading.grid_l3_a = _s16(s2[11]) / 10.0    # 31111
@@ -401,10 +406,10 @@ class GrowattVppDriver(GrowattBaseDriver):
         apparent_w = math.sqrt(ac_active_w ** 2 + ac_reactive_var ** 2)
         pf = (ac_active_w / apparent_w) if apparent_w > 1.0 else 1.0
 
-        # Per-phase W = (V_LL / √3) × I × PF  (approximation: uniform PF per phase)
-        reading.meter_l1_w = (reading.grid_l1_v / _SQRT3) * reading.grid_l1_a * pf
-        reading.meter_l2_w = (reading.grid_l2_v / _SQRT3) * reading.grid_l2_a * pf
-        reading.meter_l3_w = (reading.grid_l3_v / _SQRT3) * reading.grid_l3_a * pf
+        # Per-phase W = V_LN × I × PF  (grid_l*_v is now already L-N)
+        reading.meter_l1_w = reading.grid_l1_v * reading.grid_l1_a * pf
+        reading.meter_l2_w = reading.grid_l2_v * reading.grid_l2_a * pf
+        reading.meter_l3_w = reading.grid_l3_v * reading.grid_l3_a * pf
 
         # --- Battery 1 (S3, soft-fail; all-zero when no battery present) ---
         if s3 and any(v != 0 for v in s3):

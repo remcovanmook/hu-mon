@@ -300,13 +300,14 @@ class TestReadRegistersVPP(unittest.TestCase):
         r = driver.read_registers(client, slave_id=1)
         self.assertAlmostEqual(r.grid_freq, 49.97)
 
-    def test_grid_voltages_ll(self):
+    def test_grid_voltages_ln(self):
+        """Voltages stored as L-N (L-L raw ÷ √3); dashboard expects ~240V range."""
         driver = GrowattVppDriver()
         client = self._make_client(s2=_make_s2(v_ab=4283, v_bc=4279, v_ca=4299))
         r = driver.read_registers(client, slave_id=1)
-        self.assertAlmostEqual(r.grid_l1_v, 428.3)
-        self.assertAlmostEqual(r.grid_l2_v, 427.9)
-        self.assertAlmostEqual(r.grid_l3_v, 429.9)
+        self.assertAlmostEqual(r.grid_l1_v, 428.3 / math.sqrt(3), places=1)
+        self.assertAlmostEqual(r.grid_l2_v, 427.9 / math.sqrt(3), places=1)
+        self.assertAlmostEqual(r.grid_l3_v, 429.9 / math.sqrt(3), places=1)
 
     def test_inverter_temp(self):
         driver = GrowattVppDriver()
