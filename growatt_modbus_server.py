@@ -84,6 +84,9 @@ def run(store: GrowattStore, proxy_cfg: ProxyConfig, port: int = 5020):
 
             return None
 
+        # SimDevice requires blocks in ascending address order.
+        sim_blocks.sort(key=lambda b: b.address)
+
         devices.append(
             SimDevice(
                 id=slave_id,
