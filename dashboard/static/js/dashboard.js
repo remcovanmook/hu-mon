@@ -535,7 +535,7 @@ function connectSSE() {
             updateDOM("sum-bat-autonomy", "—");
         }
         
-        updateDOM("sum-load", d.eps_p.toFixed(0));
+        updateDOM("sum-load", d.load_p.toFixed(0));
         updateDOM("sum-load-today", "—");
         
         // Explicitly ignoring L1/L2/L3 house load splits since we cannot derive them purely from the Modbus data without assumptions
