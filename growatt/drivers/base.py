@@ -73,9 +73,14 @@ class ProbeContext:
 
     vpp_dtc: Optional[int] = field(default=None)
     """Device Type Code from VPP holding register 30000 (FC 03), or None if
-    the register was unavailable or returned zero.  Non-None means the device
-    supports VPP Protocol V2.01 or later and is a valid target for
-    GrowattVppDriver."""
+    the register was unavailable or returned zero.  Used for model metadata
+    (series, phases, has_eps) but no longer the primary probe gate."""
+
+    vpp_protocol_version: Optional[int] = field(default=None)
+    """VPP Protocol Version from holding register 30099 (FC 03), e.g. 201 for
+    V2.01, 202 for V2.02.  A value in [200, 299] is the definitive signal that
+    the device supports the VPP register map.  None means the register was
+    unavailable or returned an implausible value."""
 
 
 @dataclass
