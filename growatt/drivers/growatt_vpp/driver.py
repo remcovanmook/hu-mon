@@ -116,14 +116,19 @@ class _DtcEntry:
 
 
 _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
-    5400: _DtcEntry("MOD", False, 3),   # MOD-XH / MID-XH  (VPP V2.01 spec)
-    5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU (V2.02; live device: 12KTL3-HU)
-    5601: _DtcEntry("WIT", True,  3),
-    3725: _DtcEntry("SPA", False, 3),
-    3601: _DtcEntry("SPH", False, 1),
-    5800: _DtcEntry("WIS", False, 3),
-    5201: _DtcEntry("MIN", False, 1),
-    5200: _DtcEntry("MIC", False, 1),
+    # Source: VPP Communication Protocol V2.01, Table 3-1
+    # has_eps=True for -HU and BH-UP variants (EPS/backup output present).
+    3502: _DtcEntry("SPH", False, 1),   # SPH 3000-6000TL BL       (1-phase, no EPS)
+    3601: _DtcEntry("SPH", True,  3),   # SPH 4000-10000TL3 BH-UP  (3-phase, EPS)
+    3725: _DtcEntry("SPA", True,  3),   # SPA 4000-10000TL3 BH-UP  (3-phase, EPS)
+    3735: _DtcEntry("SPA", False, 1),   # SPA 3000-6000TL BL        (1-phase, no EPS)
+    5100: _DtcEntry("MIN", False, 1),   # MIN 2500-6000TL-XH/XH(P)  (1-phase, no EPS)
+    5200: _DtcEntry("MIC", False, 1),   # MIC/MIN 2500-6000TL-X/X2  (1-phase, no EPS)
+    5201: _DtcEntry("MIN", False, 1),   # MIN 7000-10000TL-X/X2     (1-phase, no EPS)
+    5400: _DtcEntry("MOD", False, 3),   # MOD-XH / MID-XH           (3-phase, no EPS)
+    5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU                (3-phase, EPS; confirmed live)
+    5601: _DtcEntry("WIT", True,  3),   # WIT 100KTL3-H             (3-phase, EPS)
+    5800: _DtcEntry("WIS", False, 3),   # WIS 215KTL3               (3-phase, no EPS)
 }
 
 # DTCs for which battery registers (31200-31599) are not applicable.
