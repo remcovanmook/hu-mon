@@ -5,10 +5,12 @@ A resilient, high-performance Modbus TCP proxy and telemetry collector for the G
 ## Features
 - **Strict 5s Polling:** Hardware-accurate telemetry extraction.
 - **Aggressive Reconnect:** Instantly recovers from datalogger socket closures.
+- **Hardware-Accurate Telemetry:** Extracts elusive metrics including APX battery data, EPS Backup power flows, and grid frequencies.
+- **Thermal Visibility:** Integrates reverse-engineered register shifts to track Inverter and Boost temperatures live.
+- **Web Dashboard:** A high-performance, live-updating frontend powered by Server-Sent Events (SSE). Features include responsive SVG sparklines, zero-filled historical extrapolation, EPS/Grid dynamic axis synchronization, and dark mode.
 - **Transparent Proxy:** Mimics the inverter to allow third-party systems (like Home Assistant) to poll at unlimited frequencies without crashing the datalogger.
-- **Web Dashboard:** Beautiful live SVG power flow and MPPT tracking using Flask SSE.
-- **Prometheus Metrics:** Native `/metrics` endpoint.
-- **WAL SQLite Backend:** Lock-free, tiered data persistence.
+- **Prometheus Metrics:** Native `/metrics` endpoint for integration into Grafana stacks.
+- **Tiered SQLite Backend:** Lock-free, WAL-mode database gracefully managing high-frequency rolling averages for 1-minute and 1-hour historical chart retention.
 
 ## Requirements
 - Python 3.10+
