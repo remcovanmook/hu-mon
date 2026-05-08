@@ -24,7 +24,8 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 from pymodbus.exceptions import ModbusIOException
 
@@ -98,21 +99,54 @@ def _ll_to_ln(v_rs: float, v_st: float, v_tr: float) -> tuple:
 
 
 # ---------------------------------------------------------------------------
-# DTC table
+# Register profiles and DTC table
 # ---------------------------------------------------------------------------
+
+class _RegProfile(str, Enum):
+    """
+    Describes the Modbus register space available on a given device family.
+
+    Profiles are additive: VPP devices also have Protocol II registers.
+    The proxy exposes all ranges in the detected profile.
+    """
+    BASE_PROTO_II_VPP = "base_proto_ii_vpp"  # FC03 0-124 + 3000-3374 + 30000-30099
+    BASE_PROTO_II     = "base_proto_ii"      # FC03 0-124 + 3000-3374
+    BASE_STORAGE      = "base_storage"       # FC03 0-124 + 1000-1124
+    BASE_PROTO_I_WIT  = "base_proto_i_wit"   # FC03 0-124 + 125-249 + 875-999
+
+
+# Full Protocol II FC04 block (3000-3374) is exposed for all Protocol II and
+# VPP profiles.  Our driver polls sub-ranges within this space; external clients
+# get the complete block.  VPP FC04 space (31000+) added for VPP profiles.
+_FC03_RANGES: Dict[_RegProfile, List[Tuple[int, int]]] = {
+    _RegProfile.BASE_PROTO_II_VPP: [(0, 125), (3000, 125), (3250, 125), (30000, 100)],
+    _RegProfile.BASE_PROTO_II:     [(0, 125), (3000, 125), (3250, 125)],
+    _RegProfile.BASE_STORAGE:      [(0, 125), (1000, 125)],
+    _RegProfile.BASE_PROTO_I_WIT:  [(0, 125), (125, 125),  (875, 125)],
+}
+_FC04_RANGES: Dict[_RegProfile, List[Tuple[int, int]]] = {
+    _RegProfile.BASE_PROTO_II_VPP: [(3000, 125), (3125, 125), (3250, 125),
+                                    (31000, 60),  (31100, 26), (31200, 30)],
+    _RegProfile.BASE_PROTO_II:     [(3000, 125), (3125, 125), (3250, 125)],
+    _RegProfile.BASE_STORAGE:      [(0, 125), (1000, 125)],
+    _RegProfile.BASE_PROTO_I_WIT:  [(0, 125), (125, 125), (8000, 125)],
+}
+
 
 @dataclass(frozen=True)
 class _DtcEntry:
     """
     Metadata for a Growatt VPP Device Type Code.
 
-    :param series:   Growatt product family string, e.g. "MOD", "MID", "WIT".
-    :param has_eps:  True when the device includes EPS / backup output.
-    :param phases:   Number of AC phases (1 or 3).
+    :param series:      Growatt product family string, e.g. "MOD", "MID", "WIT".
+    :param has_eps:     True when the device includes EPS / backup output.
+    :param phases:      Number of AC phases (1 or 3).
+    :param reg_profile: Register space this device family supports.
     """
-    series: str
-    has_eps: bool
-    phases: int
+    series:      str
+    has_eps:     bool
+    phases:      int
+    reg_profile: _RegProfile
 
 
 _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
@@ -121,43 +155,39 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     # DTC structure: [family (first 2 digits)] [variant (last 2 digits)]
     #   Family identifies the product line (54=MOD/MID, 56=WIT, 58=WIS,
     #           51=MIN-XH, 52=MIC/MIN-X, 36=SPH-3ph, 37=SPA-3ph, ...)
-    #   Variant encodes the feature set within that family:
-    #           00  →  XH / no EPS / no battery
-    #           01  →  HU / hybrid (EPS + battery)
-    #   Exception: 52xx uses the variant digit for power range (5200=low,
-    #              5201=high), not EPS presence. 3xxx use different encoding.
-    3502: _DtcEntry("SPH", False, 1),   # SPH 3000-6000TL BL       (1-phase, no EPS)
-    3601: _DtcEntry("SPH", True,  3),   # SPH 4000-10000TL3 BH-UP  (3-phase, EPS)
-    3725: _DtcEntry("SPA", True,  3),   # SPA 4000-10000TL3 BH-UP  (3-phase, EPS)
-    3735: _DtcEntry("SPA", False, 1),   # SPA 3000-6000TL BL        (1-phase, no EPS)
-    5100: _DtcEntry("MIN", False, 1),   # MIN 2500-6000TL-XH/XH(P)  (1-phase, no EPS)
-    5200: _DtcEntry("MIC", False, 1),   # MIC/MIN 2500-6000TL-X/X2  (1-phase, no EPS)
-    5201: _DtcEntry("MIN", False, 1),   # MIN 7000-10000TL-X/X2     (1-phase, no EPS; 01≠hybrid here)
-    5400: _DtcEntry("MOD", False, 3),   # MOD-XH / MID-XH           (3-phase, no EPS)
-    5401: _DtcEntry("MOD", True,  3),   # MOD/MID-HU  (3-phase, EPS; confirmed live: 12KTL3-HU, VPP V2.02)
-    5601: _DtcEntry("WIT", True,  3),   # WIT 100KTL3-H             (3-phase, EPS)
-    5800: _DtcEntry("WIS", False, 3),   # WIS 215KTL3               (3-phase, no EPS)
+    #   Variant: 00=XH/no-EPS, 01=HU/hybrid(EPS+battery).
+    #   Exception: 52xx uses variant for power range, not EPS.
+    3502: _DtcEntry("SPH", False, 1, _RegProfile.BASE_STORAGE),  # SPH 3000-6000TL BL
+    3601: _DtcEntry("SPH", True,  3, _RegProfile.BASE_STORAGE),  # SPH 4000-10000TL3 BH-UP
+    3725: _DtcEntry("SPA", True,  3, _RegProfile.BASE_STORAGE),  # SPA 4000-10000TL3 BH-UP
+    3735: _DtcEntry("SPA", False, 1, _RegProfile.BASE_STORAGE),  # SPA 3000-6000TL BL
+    5100: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II), # MIN 2500-6000TL-XH/XH(P)
+    5200: _DtcEntry("MIC", False, 1, _RegProfile.BASE_PROTO_II), # MIC/MIN 2500-6000TL-X/X2
+    5201: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II), # MIN 7000-10000TL-X/X2
+    5400: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD-XH / MID-XH
+    5401: _DtcEntry("MOD", True,  3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID-HU (confirmed: 12KTL3-HU V2.02)
+    5601: _DtcEntry("WIT", True,  3, _RegProfile.BASE_PROTO_I_WIT),  # WIT 100KTL3-H
+    5800: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 215KTL3
 }
 
-# DTCs for which battery registers (31200-31599) are not applicable.
-_VPP_DTC_NO_BATTERY: frozenset = frozenset({5201, 5200})
+# DTCs for which battery registers (31200+) are not applicable.
+_VPP_DTC_NO_BATTERY: frozenset = frozenset({5200, 5201})
+
 
 
 def _dtc_infer_entry(dtc: int) -> _DtcEntry:
     """
-    Best-effort inference of DTC metadata for codes not in _VPP_DTC_TABLE.
+    Return a generic _DtcEntry for DTC codes not in _VPP_DTC_TABLE.
 
-    Uses the observed encoding convention for the 5xxx family:
-      last two digits == 01  →  hybrid (has_eps=True)
-      last two digits == 00  →  non-hybrid (has_eps=False)
-    Phases default to 3 (safer; extra register reads cost little).
-    Series is marked "UNK" so callers can detect the fallback path.
+    Called only when the probe has already confirmed VPP capability via
+    vpp_protocol_version, so it is safe to assume BASE_PROTO_II_VPP.
+    Phase count defaults to 3; callers should override from FC03 reg 44 (TP).
+    Series is "UNK" to make the fallback path visible in logs.
 
     :param dtc: Raw DTC value from VPP register 30000.
-    :returns:   Inferred _DtcEntry.
+    :returns:   Generic _DtcEntry with BASE_PROTO_II_VPP profile.
     """
-    has_eps = (dtc % 100 == 1)
-    return _DtcEntry("UNK", has_eps, 3)
+    return _DtcEntry("UNK", False, 3, _RegProfile.BASE_PROTO_II_VPP)
 
 
 
@@ -218,40 +248,49 @@ class GrowattVppDriver(GrowattBaseDriver):
 
     def _probe_series(self, ctx: ProbeContext) -> bool:
         """
-        VPP series check: succeeds when the device reports a plausible VPP
-        protocol version at FC03 30099 (ctx.vpp_protocol_version in 200-299).
+        VPP series check.
 
-        This is the definitive test.  A non-VPP Growatt device will have zero
-        or garbage at 30099; only devices implementing the VPP register map
-        (V2.00+) will return a value in the expected range.
+        Priority:
+          1. Known DTC in _VPP_DTC_TABLE  →  accept unconditionally.
+             DTC codes are from the VPP spec; their presence is authoritative.
+          2. Unknown DTC + valid vpp_protocol_version (200-299)  →  accept.
+             Newer hardware likely supports VPP; infer a generic profile.
+          3. Anything else  →  reject.
 
-        ctx.vpp_dtc (FC03 30000) is logged for model identification but is
-        no longer the hard gate — unknown DTCs are handled gracefully in
-        read_device_info via _dtc_infer_entry().
+        vpp_protocol_version is NOT used as a gate for known DTCs —
+        it is retained for version-gated register-map branching in
+        read_registers.
 
         :param ctx: ProbeContext populated by registry Stages 1-3c.
         :returns:   True if this is a VPP-capable Growatt inverter.
         """
-        ver = ctx.vpp_protocol_version
-        if ver is None or not (200 <= ver <= 299):
-            logger.info(
-                "growatt_vpp: 30099=%s — not a VPP device",
-                ver if ver is not None else "None",
-            )
+        if ctx.vpp_dtc is None:
+            logger.info("growatt_vpp: no DTC — not a VPP device")
             return False
 
-        entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc) if ctx.vpp_dtc else None
+        entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc)
         if entry:
             logger.info(
-                "growatt_vpp: VPP V%d.%02d, DTC %d → %s, has_eps=%s, phases=%d",
-                ver // 100, ver % 100, ctx.vpp_dtc, entry.series, entry.has_eps, entry.phases,
+                "growatt_vpp: DTC %d → %s, profile=%s, has_eps=%s, phases=%d",
+                ctx.vpp_dtc, entry.series, entry.reg_profile.value,
+                entry.has_eps, entry.phases,
             )
-        else:
+            return True
+
+        # Unknown DTC: require VPP version confirmation before accepting.
+        ver = ctx.vpp_protocol_version
+        if ver is not None and 200 <= ver <= 299:
             logger.info(
-                "growatt_vpp: VPP V%d.%02d, DTC %s (unknown; will infer in read_device_info)",
-                ver // 100, ver % 100, ctx.vpp_dtc,
+                "growatt_vpp: DTC %d unknown, VPP V%d.%02d confirmed — using generic profile",
+                ctx.vpp_dtc, ver // 100, ver % 100,
             )
-        return True
+            return True
+
+        logger.info(
+            "growatt_vpp: DTC %d unknown and no valid vpp_protocol_version (%s) — rejecting",
+            ctx.vpp_dtc, ver,
+        )
+        return False
 
 
     # ------------------------------------------------------------------
@@ -644,28 +683,27 @@ class GrowattVppDriver(GrowattBaseDriver):
     # Proxy config
     # ------------------------------------------------------------------
 
-    def proxy_config(self, slave_id: int) -> ProxyConfig:
+    def proxy_config(self, slave_id: int, ctx: ProbeContext) -> ProxyConfig:
         """
-        Modbus address ranges the proxy server should expose.
+        Build the Modbus address map from the DTC register profile.
 
-        FC03 30000-30099 covers VPP identity + control holding registers.
-        FC04 ranges mirror the five poll segments.
+        FC03 and FC04 ranges are derived from the active ``_RegProfile``
+        (set on ``_dtc_entry`` during ``read_device_info``, or falling back to
+        ``BASE_PROTO_II_VPP`` for unknown DTCs).  The full Protocol II block is
+        always included for Protocol II / VPP profiles so external clients can
+        access the complete device register space, not just our polling ranges.
+
+        An extra FC03 3125-3249 range is appended for MIN TL-XH US devices
+        when ``ctx.proto_ii_us_available`` is set.
 
         :param slave_id: Confirmed Modbus slave address.
-        :returns:        ProxyConfig describing servable register ranges.
+        :param ctx:      ProbeContext carrying protocol capability flags.
+        :returns:        ProxyConfig describing the servable register space.
         """
-        return ProxyConfig(
-            address_map={
-                slave_id: {
-                    3: [(30000, 100)],
-                    4: [
-                        (3026,  10),
-                        (31000, 60),
-                        (31100, 26),
-                        (31200, 30),
-                        (3049,  47),
-                        (3130,  30),
-                    ],
-                }
-            }
-        )
+        entry = self._dtc_entry
+        profile = entry.reg_profile if entry else _RegProfile.BASE_PROTO_II_VPP
+        fc03 = list(_FC03_RANGES[profile])
+        fc04 = list(_FC04_RANGES[profile])
+        if ctx.proto_ii_us_available:
+            fc03.append((3125, 125))
+        return ProxyConfig(address_map={slave_id: {3: fc03, 4: fc04}})

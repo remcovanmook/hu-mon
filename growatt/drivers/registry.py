@@ -170,9 +170,10 @@ def _read_holding_block(client, slave_id: int) -> Tuple[Optional[list], int]:
 def auto_select(
     client,
     force_driver_id: Optional[str] = None,
-) -> Tuple[BaseDriver, int]:
+) -> Tuple[BaseDriver, int, ProbeContext]:
     """
-    Run the probe pipeline and return the matching driver and slave ID.
+    Run the probe pipeline and return the matching driver, slave ID, and
+    ProbeContext.
 
     Stages 1–3 always run (needed to establish slave_id and ProbeContext).
     Stage 4 (driver matching) is skipped if force_driver_id is given.
@@ -181,7 +182,7 @@ def auto_select(
     :param force_driver_id: If set, skip registry matching and use this
                             driver ID directly.  Raises ValueError if the
                             ID is not in DRIVER_REGISTRY.
-    :returns: (driver_instance, slave_id)
+    :returns: (driver_instance, slave_id, ctx)
     :raises RuntimeError: If no slave responds or no driver matches.
     """
     # Stage 1: Slave ID
@@ -227,7 +228,6 @@ def auto_select(
 
     # Stage 3c: VPP DTC (FC 03, register 30000) and Protocol Version (30099).
     # Reading the full 100-register block saves a round-trip and gives us both.
-    # A protocol version in range 200-299 is the definitive VPP identifier.
     vpp_dtc = None
     vpp_protocol_version = None
     if 3 in supported_fcs:
@@ -254,6 +254,19 @@ def auto_select(
         except Exception as exc:
             logger.debug("VPP block read failed: %s", exc)
 
+    # Stage 3d: US-variant probe — only for MIN TL-XH (DTC 5100).
+    # FC03 3125 is the start of the US-specific extension block.  All other
+    # model families have a fixed register map; only 5100 has two variants.
+    proto_ii_us_available = False
+    if 3 in supported_fcs and vpp_dtc == 5100:
+        try:
+            r = client.read_holding_registers(3125, count=1, device_id=slave_id)
+            if not r.isError():
+                proto_ii_us_available = True
+                logger.info("Proto II US extension (FC03 3125) confirmed for DTC 5100")
+        except Exception as exc:
+            logger.debug("US probe failed: %s", exc)
+
     ctx = ProbeContext(
         slave_id=slave_id,
         supported_fcs=supported_fcs,
@@ -262,9 +275,8 @@ def auto_select(
         input_block=input_block,
         vpp_dtc=vpp_dtc,
         vpp_protocol_version=vpp_protocol_version,
+        proto_ii_us_available=proto_ii_us_available,
     )
-
-
 
     # Stage 4: Driver matching
     if force_driver_id is not None:
@@ -272,7 +284,7 @@ def auto_select(
             instance = driver_cls()
             if instance.driver_id == force_driver_id:
                 logger.info("Forced driver: %s", force_driver_id)
-                return instance, slave_id
+                return instance, slave_id, ctx
         raise ValueError(
             f"Driver '{force_driver_id}' not found in registry. "
             f"Available: {[d().driver_id for d in DRIVER_REGISTRY]}"
@@ -282,7 +294,7 @@ def auto_select(
         instance = driver_cls()
         if instance.probe(ctx):
             logger.info("Auto-selected driver: %s (slave_id=%d)", instance.driver_id, slave_id)
-            return instance, slave_id
+            return instance, slave_id, ctx
 
     raise RuntimeError(
         f"No driver matched the device on slave_id={slave_id}. "

@@ -187,7 +187,7 @@ class TestAutoSelect(unittest.TestCase):
         DRIVER_REGISTRY.clear()
         DRIVER_REGISTRY.append(MockDriver)
         try:
-            driver, slave_id = auto_select(client)
+            driver, slave_id, ctx = auto_select(client)
             self.assertEqual(driver.driver_id, "mock")
             self.assertIn(slave_id, _SLAVE_ID_CANDIDATES)
         finally:
@@ -221,7 +221,7 @@ class TestAutoSelect(unittest.TestCase):
         DRIVER_REGISTRY.clear()
         DRIVER_REGISTRY.append(MockDriver)
         try:
-            driver, _ = auto_select(client, force_driver_id="my_driver")
+            driver, _, ctx = auto_select(client, force_driver_id="my_driver")
             self.assertEqual(driver.driver_id, "my_driver")
         finally:
             DRIVER_REGISTRY.clear()

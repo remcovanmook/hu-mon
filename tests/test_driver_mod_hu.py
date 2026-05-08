@@ -401,7 +401,13 @@ class TestReadRegistersShifted(unittest.TestCase):
 class TestProxyConfig(unittest.TestCase):
 
     def setUp(self):
-        self.cfg = GrowattModHuDriver().proxy_config(slave_id=1)
+        ctx = ProbeContext(
+            slave_id=1,
+            supported_fcs={3, 4},
+            holding_block=None,
+            max_block_size=125,
+        )
+        self.cfg = GrowattModHuDriver().proxy_config(slave_id=1, ctx=ctx)
 
     def test_address_map_has_slave_1(self):
         self.assertIn(1, self.cfg.address_map)
@@ -411,10 +417,9 @@ class TestProxyConfig(unittest.TestCase):
         self.assertIn(3, fc_map)
         self.assertIn(4, fc_map)
 
-    def test_fc4_ranges_match_segments(self):
-        from growatt.drivers.growatt_mod_hu.driver import SEGMENTS, _FC_LABEL
-        expected = [(s, c) for label, s, c in SEGMENTS if _FC_LABEL[label] == 4]
-        self.assertEqual(self.cfg.address_map[1][4], expected)
+    def test_fc4_covers_full_proto_ii(self):
+        # Full Protocol II block A must be present.
+        self.assertIn((3000, 125), self.cfg.address_map[1][4])
 
     def test_fc3_ranges_non_empty(self):
         self.assertGreater(len(self.cfg.address_map[1][3]), 0)

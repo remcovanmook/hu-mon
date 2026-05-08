@@ -150,27 +150,31 @@ class GrowattModHuDriver(GrowattBaseDriver):
     def driver_id(self) -> str:
         return "growatt_mod_hu"
 
-    def proxy_config(self, slave_id: int) -> ProxyConfig:
+    def proxy_config(self, slave_id: int, ctx: ProbeContext) -> ProxyConfig:
         """
         Return the Modbus address space the proxy server should expose.
 
-        Structured as {slave_id: {function_code: [(start, count)]}}.  FC 04
-        ranges are derived from SEGMENTS so the proxy and collector always cover
-        the same address space.  FC 03 ranges cover the one-time metadata
-        registers read by read_device_info(), allowing third-party systems to
-        query device identity through the proxy.
+        Exposes the full FC03 base block (0-124) and Protocol II blocks
+        (3000-3374) plus the holding ranges used by read_device_info.
+        FC04 covers the full Protocol II address space.
 
         :param slave_id: Confirmed Modbus slave address from the probe pipeline.
+        :param ctx:      ProbeContext (unused here; accepted for interface compat).
         :returns:        ProxyConfig describing the servable register space.
         """
-        # Build FC 04 map from SEGMENTS.
-        fc4_ranges = [(start, count) for label, start, count in SEGMENTS
-                      if _FC_LABEL[label] == 4]
         return ProxyConfig(
             address_map={
                 slave_id: {
-                    3: _PROXY_HOLDING_RANGES,
-                    4: fc4_ranges,
+                    3: [
+                        (0,    125),   # Base: firmware, DTC, RTC, TP, manuf. info
+                        (1001,   5),   # Battery type (1001), capacity (1002), energy (1005)
+                        (3001,  15),   # Serial number
+                    ],
+                    4: [
+                        (3000, 125),   # Protocol II block A
+                        (3125, 125),   # Protocol II block B
+                        (3250, 125),   # Protocol II block C
+                    ],
                 }
             }
         )

@@ -12,6 +12,7 @@ from growatt.drivers.base import ProbeContext
 from growatt.drivers.growatt_vpp.driver import (
     GrowattVppDriver,
     _DtcEntry,
+    _RegProfile,
     _VPP_DTC_TABLE,
     _build_model_string,
     _ll_to_ln,
@@ -83,20 +84,20 @@ class TestLlToLn(unittest.TestCase):
 class TestBuildModelString(unittest.TestCase):
 
     def test_3phase_hu(self):
-        entry = _DtcEntry("MOD", True, 3)
+        entry = _DtcEntry("MOD", True, 3, _RegProfile.BASE_PROTO_II_VPP)
         self.assertEqual(_build_model_string(entry, 12000), "MOD 12KTL3-HU")
 
     def test_3phase_xh(self):
-        entry = _DtcEntry("MOD", False, 3)
+        entry = _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP)
         self.assertEqual(_build_model_string(entry, 10000), "MOD 10KTL3-XH")
 
     def test_1phase(self):
-        entry = _DtcEntry("SPH", False, 1)
+        entry = _DtcEntry("SPH", False, 1, _RegProfile.BASE_STORAGE)
         self.assertEqual(_build_model_string(entry, 5000), "SPH 5KTL-XH")
 
     def test_rounding(self):
         # 11993W → rounds to 12kW
-        entry = _DtcEntry("MOD", True, 3)
+        entry = _DtcEntry("MOD", True, 3, _RegProfile.BASE_PROTO_II_VPP)
         self.assertEqual(_build_model_string(entry, 11993), "MOD 12KTL3-HU")
 
 
@@ -109,26 +110,34 @@ class TestProbeSeriesVPP(unittest.TestCase):
     def setUp(self):
         self.driver = GrowattVppDriver()
 
-    def test_valid_vpp_version_accepted(self):
-        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=202)
+    def test_known_dtc_accepted_without_version(self):
+        """Known DTC in table is accepted even if vpp_protocol_version is absent."""
+        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=None)
         self.assertTrue(self.driver._probe_series(ctx))
 
-    def test_no_vpp_version_rejected(self):
-        """Devices without a plausible 30099 value are not VPP."""
-        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=None)
-        self.assertFalse(self.driver._probe_series(ctx))
-
-    def test_garbage_vpp_version_rejected(self):
-        """Out-of-range 30099 (e.g. 0 or random non-VPP value) is rejected."""
+    def test_known_dtc_accepted_with_garbage_version(self):
+        """Known DTC in table is accepted even if 30099 contains garbage."""
         ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=0)
-        self.assertFalse(self.driver._probe_series(ctx))
+        self.assertTrue(self.driver._probe_series(ctx))
         ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=9999)
-        self.assertFalse(self.driver._probe_series(ctx))
+        self.assertTrue(self.driver._probe_series(ctx))
 
     def test_unknown_dtc_accepted_when_version_valid(self):
-        """Unknown DTC is fine as long as protocol version is plausible."""
+        """Unknown DTC is accepted when protocol version is plausible (200-299)."""
         ctx = _make_ctx(vpp_dtc=9999, vpp_protocol_version=201)
         self.assertTrue(self.driver._probe_series(ctx))
+
+    def test_unknown_dtc_rejected_when_version_invalid(self):
+        """Unknown DTC without a valid version is rejected."""
+        ctx = _make_ctx(vpp_dtc=9999, vpp_protocol_version=None)
+        self.assertFalse(self.driver._probe_series(ctx))
+        ctx = _make_ctx(vpp_dtc=9999, vpp_protocol_version=0)
+        self.assertFalse(self.driver._probe_series(ctx))
+
+    def test_no_dtc_rejected(self):
+        """No DTC at all is always rejected."""
+        ctx = _make_ctx(vpp_dtc=None, vpp_protocol_version=202)
+        self.assertFalse(self.driver._probe_series(ctx))
 
     def test_all_known_dtcs_accepted(self):
         for dtc in _VPP_DTC_TABLE:

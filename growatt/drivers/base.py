@@ -78,9 +78,13 @@ class ProbeContext:
 
     vpp_protocol_version: Optional[int] = field(default=None)
     """VPP Protocol Version from holding register 30099 (FC 03), e.g. 201 for
-    V2.01, 202 for V2.02.  A value in [200, 299] is the definitive signal that
-    the device supports the VPP register map.  None means the register was
-    unavailable or returned an implausible value."""
+    V2.01, 202 for V2.02.  None means the register was unavailable or returned
+    an implausible value.  Used for version-gated register-map branching."""
+
+    proto_ii_us_available: bool = False
+    """True when FC 03 3125 responds with non-error data.  Only probed when
+    DTC is 5100 (MIN TL-XH/XH(P)), the only model with a documented US-market
+    extension at 3125–3249.  False for all other device families."""
 
 
 @dataclass
@@ -175,18 +179,18 @@ class BaseDriver(ABC):
         """
 
     @abstractmethod
-    def proxy_config(self, slave_id: int) -> ProxyConfig:
+    def proxy_config(self, slave_id: int, ctx: "ProbeContext") -> ProxyConfig:
         """
         Return the Modbus address space this driver expects the proxy to serve.
 
-        Called once after probe() succeeds, using the confirmed slave_id.
-        The proxy server uses this to build its register data block (slave ID,
-        supported FCs, address ranges) instead of hardcoding device-specific
-        values.
+        Called once after probe() succeeds, using the confirmed slave_id and
+        the ProbeContext from the probe pipeline so drivers can tailor the proxy
+        map to detected protocol capabilities (Protocol II, VPP, US variant).
 
-        Implementations should derive ranges directly from their SEGMENTS
-        constant so the proxy and the collector stay in sync automatically.
+        Implementations should build FC03/FC04 ranges from the detected register
+        profile rather than hardcoding device-specific values.
 
         :param slave_id: Confirmed Modbus slave address from the probe pipeline.
+        :param ctx:      ProbeContext carrying detected protocol flags.
         :returns:        ProxyConfig describing the servable register space.
         """
