@@ -159,17 +159,27 @@ The inverter's exact model name and power rating are not stored as ASCII. Instea
 2. Extract the Series Code (Upper 16 bits): `series_code = (module_id >> 16) & 0xFFFF`
 3. Extract the Power Rating (Lower 16 bits): `power_watts = module_id & 0xFFFF`
 
-**Known Series Codes:**
-* `0x05`: MIN
-* `0x0B`: MOD
-* `0x0C`: MID
-* `0x0D`: SPH
-* `0x0E`: SPA
-* `0x0F`: MIC
-* `0x10`: MAC
-* `0x11`: MAX
+**Known Series Codes & Phase Mappings:**
+* `0x05`: **MIN** (Single-Phase)
+* `0x0B`: **MOD** (Three-Phase)
+* `0x0C`: **MID** (Three-Phase)
+* `0x0D`: **SPH** (Single/Three-Phase Hybrid)
+* `0x0E`: **SPA** (AC Coupled)
+* `0x0F`: **MIC** (Single-Phase)
+* `0x10`: **MAC** (Three-Phase)
+* `0x11`: **MAX** (Three-Phase)
 
-*(Example: If `module_id` evaluates to Series `0x0B` and Power `12000`, the model is `MOD 12KTL3-HU`.)*
+#### Deriving the Full Model String
+The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3-HU`) is constructed via the following logic:
+1. **`K` (Kilo):** If `power_watts` $\ge 3000$, it is divided by $1000$ and appended with `K` (e.g., `12000` $\rightarrow$ `12K`).
+2. **`TL` (Transformer-Less):** Assumed universally for all modern Growatt grid-tied architectures.
+3. **`3` (Three-Phase):** Explicitly appended if the Series is natively 3-phase (like `MOD`, `MID`, `MAX`).
+4. **`-HU` / `-XH` (Feature Suffix):** 
+   * **`-XH`**: Battery-ready.
+   * **`-HU`**: Full Hybrid (High-Voltage). 
+   * *Note:* The specific generation or feature suffix is notoriously difficult to extract from the base Modbus registers. It is usually inferred via system capabilities (e.g., if the inverter responds to EPS blocks and APX battery holding registers, it is a Hybrid `-HU`).
+
+*(Example: `module_id` yields `MOD` and `12000`. It is $\ge 3000$, so it becomes `12K`. `MOD` is 3-phase, adding `TL3`. Hybrid APX battery features are active, appending `-HU`. Final result: `MOD 12KTL3-HU`.)*
 
 ### Inverter Status (Input Reg 3000)
 * **0**: Waiting (Startup or low light)
