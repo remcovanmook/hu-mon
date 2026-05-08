@@ -1,10 +1,10 @@
-This document provides the full technical specification for interacting with the **Growatt MOD 12KTL3-HU** hybrid inverter via the **ShineWifi-X2** datalogger.
+This document provides the full technical specification for interacting with the **2025-2026 Growatt 3-Phase Hybrid Generation** (MOD-HU, MOD-XH, MID-XH series) via the **ShineWifi-X2** datalogger.
 
 ---
 
-# Growatt 12KTL3-HU Interaction Specification
+# Growatt 3-Phase Hybrid (Protocol II) Specification
 **Interface:** Modbus TCP via ShineWifi-X2  
-**Protocol Version:** Growatt Modbus RTU Protocol II (Storage/Hybrid)  
+**Protocol Version:** Growatt Modbus RTU Protocol II (Storage/Hybrid v7.6+)  
 **Port:** `502`
 
 ## 1. Connection Parameters
@@ -28,7 +28,21 @@ This document provides the full technical specification for interacting with the
 
 ---
 
-## 3. Firmware Memory Layout Patterns
+## 3. Firmware Architecture & Compatibility
+Based on the "Shifted Contiguous" logic and the firmware branches (e.g. `7.6.x`), this mapping applies across the modern Growatt 3-Phase ecosystem. Growatt reuses the same DSP code across chassis families:
+
+* **Direct Coverage:** The entire `MOD-HU` (3kW-15kW) and `MOD-XH` series. These share the exact internal architecture and Modbus mapping.
+* **High Likelihood (Close Cousins):** The `MID-XH` (11kW-30kW) commercial versions and the latest `SPH TL3-BH-UP` hybrids. They utilize the same Protocol II stack and 3-phase telemetry structures.
+* **Partial Overlap:** The single-phase `MIN-XH` series will lack the 3-phase Grid and EPS blocks, but likely shares the Metadata (`3001`) and Thermal (`3094`) shifts.
+
+### The "North Star" Auto-Detection Heuristic
+Because legacy single-phase mappings and older Protocol I maps clash with this contiguous block architecture, software should use an auto-detection heuristic before parsing this map. 
+
+If you read `Reg 3025` and it returns the Grid Frequency (e.g., `>4000` for 50Hz) and `Reg 3026` returns a valid L1 Voltage (e.g., `>1000`), you have a positive lock on the **Shifted-Contiguous Unit** profile, regardless of the model string.
+
+---
+
+## 4. Firmware Memory Layout Patterns
 Growatt's three-phase firmware relies on three strictly consistent data structures to pack memory:
 
 ### A. The "4-Register Power Block" (Used for PV and Grid)
@@ -57,7 +71,7 @@ Every lifetime energy metric is allocated exactly 4 contiguous registers: `Today
 
 ---
 
-## 4. Consolidated Register Map (Function Code 04)
+## 5. Consolidated Register Map (Function Code 04)
 These registers are Read-Only and provide real-time telemetry.
 
 | Function Code | Address | Name | Type | Unit | Scale | Description |
@@ -152,7 +166,7 @@ These registers are Read-Only and provide real-time telemetry.
 ---
 
 
-## 5. Device Identification & Status
+## 6. Device Identification & Status
 ### Algorithmic Model Decoding (Holding Reg 28-29)
 The inverter's exact model name and power rating are not stored as ASCII. Instead, they are algorithmically encoded in a 32-bit integer spread across Holding Registers `28` and `29` (Function Code 03):
 1. Compute `module_id = (Reg[28] << 16) | Reg[29]`
@@ -195,7 +209,7 @@ The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3
 
 ---
 
-## 6. Interaction Sequence (Polling Strategy)
+## 7. Interaction Sequence (Polling Strategy)
 Due to the memory constraints of the ESP32 in the ShineWifi-X2, the following interaction sequence is required for stability:
 
 1.  **Open Connection**: Establish Modbus TCP on 5020.
@@ -210,7 +224,7 @@ Due to the memory constraints of the ESP32 in the ShineWifi-X2, the following in
     * Apply scaling.
 8.  **Close or Idle**: Either close the socket or wait `5 seconds` before the next cycle.
 
-## 7. Known Constraints
+## 8. Known Constraints
 * **Max Register Read**: Do not exceed **64 registers** per single Modbus request.
-* **Concurrent Connections**: The ShineWifi-X2 generally supports only **one** concurrent TCP connection on 5020. If multiple clients connect, the datalogger often reboots.
+* **Concurrent Connections**: The ShineWifi-X2 generally supports only **one** concurrent TCP connection on 502. If multiple clients connect, the datalogger often reboots.
 * **Night Mode**: When PV voltage is zero, some registers may hold their "Last Known Good" value or revert to `0xFFFF` ($65535$). The API must filter these.
