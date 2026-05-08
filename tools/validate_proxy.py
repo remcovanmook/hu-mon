@@ -25,6 +25,7 @@ Exit code:
 """
 
 import argparse
+import socket
 import sys
 import time
 import urllib.request
@@ -301,14 +302,100 @@ def probe_http(host: str, port: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# MQTT reachability check
 # ---------------------------------------------------------------------------
+
+def probe_mqtt(host: str, port: int) -> bool:
+    """
+    Verify the MQTT broker is reachable on the given host and port.
+
+    Does a plain TCP connection check only — does not perform an MQTT
+    handshake.  Use ``mosquitto_sub`` or another client to verify the
+    message flow after the server is running.
+
+    :param host: MQTT broker hostname or IP.
+    :param port: MQTT broker TCP port.
+    :returns:    True if the TCP connection succeeded.
+    """
+    print(f"\n{'='*60}")
+    print(f"  MQTT broker  {host}:{port}")
+    print(f"{'='*60}\n")
+    try:
+        with socket.create_connection((host, port), timeout=5):
+            _ok(f"TCP connection to {host}:{port} succeeded")
+            _info("Subscribe to 'growatt/+/state' or 'growatt/+/#' to verify message flow")
+            return True
+    except OSError as exc:
+        _fail(f"Cannot reach {host}:{port} — {exc}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# InfluxDB reachability + write check
+# ---------------------------------------------------------------------------
+
+def probe_influx(url: str, token: str, org: str, bucket: str, db: str) -> bool:
+    """
+    Verify the InfluxDB instance is reachable and accepts writes.
+
+    Sends a minimal test data point to confirm the endpoint and
+    credentials are correct.  The test measurement is ``growatt_validate``
+    with a single field ``ok=1i``.
+
+    :param url:    InfluxDB base URL (e.g. http://localhost:8086).
+    :param token:  v2 API token; empty for v1.
+    :param org:    v2 organisation.
+    :param bucket: v2 bucket.
+    :param db:     v1 database.
+    :returns:      True if the write was accepted (HTTP 204).
+    """
+    import time as _time
+    from urllib.parse import urlencode
+
+    print(f"\n{'='*60}")
+    print(f"  InfluxDB  {url}")
+    print(f"{'='*60}\n")
+
+    url = url.rstrip('/')
+    ts_s = int(_time.time())
+    line = f"growatt_validate ok=1i {ts_s}"
+
+    headers = {'Content-Type': 'text/plain; charset=utf-8'}
+    if token:
+        headers['Authorization'] = f'Token {token}'
+        query = urlencode({'org': org, 'bucket': bucket, 'precision': 's'})
+        endpoint = f"{url}/api/v2/write?{query}"
+        _info(f"Using InfluxDB v2  org={org!r}  bucket={bucket!r}")
+    else:
+        query = urlencode({'db': db, 'precision': 's'})
+        endpoint = f"{url}/write?{query}"
+        _info(f"Using InfluxDB v1  db={db!r}")
+
+    req = urllib.request.Request(
+        endpoint, data=line.encode('utf-8'), headers=headers, method='POST'
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status in (200, 204):
+                _ok(f"Write accepted (HTTP {resp.status}) — measurement: growatt_validate")
+                return True
+            else:
+                _fail(f"HTTP {resp.status}: {resp.read()[:120]}")
+                return False
+    except urllib.error.HTTPError as exc:
+        _fail(f"HTTP {exc.code}: {exc.reason}")
+        return False
+    except Exception as exc:
+        _fail(f"Connection error: {exc}")
+        return False
+
+
 
 def main() -> int:
     """
-    Parse arguments and run Modbus proxy and HTTP endpoint validation.
+    Parse arguments and run all configured validation probes.
 
-    :returns: 0 on success, 1 on any failure.
+    :returns: 0 if all active probes passed, 1 on any failure.
     """
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -324,15 +411,38 @@ def main() -> int:
                         help="Dashboard HTTP port (default: 8081)")
     parser.add_argument("--no-http",   action="store_true",
                         help="Skip HTTP endpoint checks")
+    # MQTT
+    parser.add_argument("--mqtt-host", default="",
+                        help="MQTT broker host to validate (skipped if empty)")
+    parser.add_argument("--mqtt-port", type=int, default=1883,
+                        help="MQTT broker port (default: 1883)")
+    # InfluxDB
+    parser.add_argument("--influx-url",    default="",
+                        help="InfluxDB base URL to validate (skipped if empty)")
+    parser.add_argument("--influx-token",  default="",
+                        help="InfluxDB v2 API token")
+    parser.add_argument("--influx-org",    default="",
+                        help="InfluxDB v2 organisation")
+    parser.add_argument("--influx-bucket", default="",
+                        help="InfluxDB v2 bucket")
+    parser.add_argument("--influx-db",     default="growatt",
+                        help="InfluxDB v1 database (default: growatt)")
     args = parser.parse_args()
 
-    modbus_ok = probe_modbus(args.host, args.port, args.slave)
-    http_ok = True
+    results = []
+    results.append(probe_modbus(args.host, args.port, args.slave))
     if not args.no_http:
-        http_ok = probe_http(args.host, args.http_port)
+        results.append(probe_http(args.host, args.http_port))
+    if args.mqtt_host:
+        results.append(probe_mqtt(args.mqtt_host, args.mqtt_port))
+    if args.influx_url:
+        results.append(probe_influx(
+            args.influx_url, args.influx_token, args.influx_org,
+            args.influx_bucket, args.influx_db,
+        ))
 
     print()
-    return 0 if (modbus_ok and http_ok) else 1
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":

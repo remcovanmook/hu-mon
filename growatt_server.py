@@ -29,6 +29,8 @@ def main():
     parser.add_argument("--mqtt-port", type=int, default=1883)
     parser.add_argument("--mqtt-user", default="")
     parser.add_argument("--mqtt-pass", default="")
+    parser.add_argument("--mqtt-topic-prefix", default="",
+                        help="MQTT topic prefix (default: growatt/<serial>/)")
     
     # InfluxDB Options
     parser.add_argument("--influx-url", default="")
@@ -82,7 +84,8 @@ def main():
         from growatt.mqtt_publisher import run as run_mqtt
         threading.Thread(
             target=run_mqtt,
-            args=(store, args.mqtt_host, args.mqtt_port, args.mqtt_user, args.mqtt_pass),
+            args=(store, args.mqtt_host, args.mqtt_port, args.mqtt_user, args.mqtt_pass,
+                  args.mqtt_topic_prefix),
             daemon=True,
             name="growatt-mqtt"
         ).start()
