@@ -492,10 +492,12 @@ Source: Growatt Inverter Modbus RTU Protocol II V1.39. All registers accessible 
 | 18 | Time start | RW | U16 | 1 s | Startup delay after PV available |
 | 22 | Baud rate | RW | U16 | — | 0=9600, 1=38400 |
 | 23–27 | Serial number | R | ASCII×5 | — | 10 chars (older models; newer use FC03 3001–3015) |
-| 28 | Module H | R | U16 | — | Series code (high word of module ID) |
-| 29 | Module L | R | U16 | — | Rated watts (low word of module ID) |
+| 28 | Module H | R | U16 | — | **Protocol II series code** (high word of module ID). Not the DTC. See note below. |
+| 29 | Module L | R | U16 | — | **Rated watts** (low word of module ID). |
 | 30 | COM address | RW | U16 | — | RS485 slave address [1,254]; default 1 |
 | 44 | TP register | R | U16 | — | High byte = PV string input count; low byte = AC phase count |
+
+> **Module ID vs DTC:** These are two separate identification schemes. FC03 28–29 is the Protocol II module ID — it encodes a series code and rated power and predates VPP. The **DTC** (Device Type Code) is a different, VPP-specific value at **FC03 30000** and is not present in FC03 0–124. On VPP devices both are available; on older Protocol II-only devices only the module ID exists.
 
 ### Second Group Identity (125–127)
 
