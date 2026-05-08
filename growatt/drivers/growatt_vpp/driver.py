@@ -150,28 +150,77 @@ class _DtcEntry:
 
 
 _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
-    # Source: VPP Communication Protocol V2.01, Table 3-1
+    # Source: VPP Communication Protocol V2.03, Table 3-1
     #
-    # DTC structure: [family (first 2 digits)] [variant (last 2 digits)]
-    #   Family identifies the product line (54=MOD/MID, 56=WIT, 58=WIS,
-    #           51=MIN-XH, 52=MIC/MIN-X, 36=SPH-3ph, 37=SPA-3ph, ...)
-    #   Variant: 00=XH/no-EPS, 01=HU/hybrid(EPS+battery).
-    #   Exception: 52xx uses variant for power range, not EPS.
-    3502: _DtcEntry("SPH", False, 1, _RegProfile.BASE_STORAGE),  # SPH 3000-6000TL BL
-    3601: _DtcEntry("SPH", True,  3, _RegProfile.BASE_STORAGE),  # SPH 4000-10000TL3 BH-UP
-    3725: _DtcEntry("SPA", True,  3, _RegProfile.BASE_STORAGE),  # SPA 4000-10000TL3 BH-UP
-    3735: _DtcEntry("SPA", False, 1, _RegProfile.BASE_STORAGE),  # SPA 3000-6000TL BL
-    5100: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II), # MIN 2500-6000TL-XH/XH(P)
-    5200: _DtcEntry("MIC", False, 1, _RegProfile.BASE_PROTO_II), # MIC/MIN 2500-6000TL-X/X2
-    5201: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II), # MIN 7000-10000TL-X/X2
-    5400: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD-XH / MID-XH
-    5401: _DtcEntry("MOD", True,  3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID-HU (confirmed: 12KTL3-HU V2.02)
-    5601: _DtcEntry("WIT", True,  3, _RegProfile.BASE_PROTO_I_WIT),  # WIT 100KTL3-H
-    5800: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 215KTL3
+    # DTC structure: [family prefix] [variant suffix]
+    #   35xx = SPH (single-phase hybrid with battery)
+    #   36xx = SPH 3-phase hybrid
+    #   37xx = SPA (single-phase AC-coupled)
+    #   51xx = MIN-XH
+    #   52xx = MIC/MIN-X (grid-tie, no battery)
+    #   54xx = MOD/MID-XH or HU (3-phase hybrid)
+    #   50xx = MOD/MID/MAC-X (3-phase grid-tie, no battery) — V2.03 addition
+    #   55xx = MAX (large 3-phase grid-tie, no battery)     — V2.03 addition
+    #   56xx = WIT (large commercial, 3-phase, EPS)
+    #   58xx = WIS (large commercial, 3-phase, no EPS)
+
+    # --- SPH single-phase hybrid (BASE_STORAGE) ---
+    3501: _DtcEntry("SPH", True,  1, _RegProfile.BASE_STORAGE),   # SPH 3000-6000TL BL
+    3502: _DtcEntry("SPH", True,  1, _RegProfile.BASE_STORAGE),   # SPH 3000-6000TL BL-UP
+    3503: _DtcEntry("SPH", True,  1, _RegProfile.BASE_STORAGE),   # SPH 3000-6000TL HU
+    3504: _DtcEntry("SPH", True,  1, _RegProfile.BASE_STORAGE),   # SPH 3000-6000TL HUB
+
+    # --- SPH 3-phase hybrid (BASE_STORAGE) ---
+    3601: _DtcEntry("SPH", True,  3, _RegProfile.BASE_STORAGE),   # SPH 4-10KTL3 BH-UP
+
+    # --- SPA single-phase AC-coupled (BASE_STORAGE) ---
+    3701: _DtcEntry("SPA", True,  1, _RegProfile.BASE_STORAGE),   # SPA 1000-3000TL BL
+    3715: _DtcEntry("SPA", True,  1, _RegProfile.BASE_STORAGE),   # SPA 3000-6000TL AU
+    3716: _DtcEntry("SPA", True,  1, _RegProfile.BASE_STORAGE),   # SPA 3000-6000TL AUB
+    3735: _DtcEntry("SPA", False, 1, _RegProfile.BASE_STORAGE),   # SPA 3000TL BL-UP
+
+    # --- SPA 3-phase (BASE_STORAGE) ---
+    3725: _DtcEntry("SPA", True,  3, _RegProfile.BASE_STORAGE),   # SPA 4-10KTL3 BH-UP
+
+    # --- MIN-XH Protocol II single-phase (BASE_PROTO_II) ---
+    5100: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II),  # MIN-XH / MIN 2500-6000TL-XH/XH2/XHE/XA
+
+    # --- MIC/MIN-X Protocol II single-phase grid-tie, no battery (BASE_PROTO_II) ---
+    5200: _DtcEntry("MIC", False, 1, _RegProfile.BASE_PROTO_II),  # MIC 600-3300TL-X/X2/X2(Pro); MIN 2500-6000TL-X/X2/X2(Pro)/X2(Pro.E)
+    5201: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II),  # MIN 7-10KTL-X/X2/X2(E)
+
+    # --- MOD/MID/MAC-X 3-phase grid-tie, no battery (BASE_PROTO_II_VPP) — V2.03 ---
+    5000: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID/MAC-X (base)
+    5001: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MID 17-25KTL3-X; MID 20-30KTL3-X2; MID 25-50KTL3-X2 Pro; MID 30-40KTL3-X
+    5002: _DtcEntry("MID", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MID 33-36KTL3-X(Pro.E); MID 3-33KTL3-X3; MOD 3-15KTL3-X
+    5003: _DtcEntry("MAC", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD 3-15KTL3-X2(Pro); MOD 12-20KTL3-X2; MAC 30-70KTL3-X; MAC 15-36KTL3-XL; MAC 50-70KTL3-X2
+
+    # --- MOD/MID-XH and MOD/MID-HU 3-phase hybrid (BASE_PROTO_II_VPP) ---
+    5400: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD-XH/MID-XH; MOD 3-10KTL3-XH/BP; MID 11-30KTL3-XH; MID 8-15KTL3-XHL/JP
+    5401: _DtcEntry("MOD", True,  3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID-HU; MOD 3-15KTL3-HU; MID 33-50KTL3-HU  (confirmed: 12KTL3-HU V2.02)
+
+    # --- MAX 3-phase grid-tie, large commercial (BASE_PROTO_II_VPP) — V2.03 ---
+    5500: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 50-100KTL3 LV/MV
+    5501: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 175-253KTL3-X HV
+    5502: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 80-150KTL3-X LV/MV; MAX 100-150KYL3-X2 LV/MV; MAX 320-350KTL3-X
+
+    # --- WIT large commercial 3-phase with EPS (BASE_PROTO_I_WIT) ---
+    5600: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_I_WIT),  # WIS 100K-AM — V2.03 addition
+    5601: _DtcEntry("WIT", True,  3, _RegProfile.BASE_PROTO_I_WIT),  # WIT 50-100K-H/HE/HU/A/AE/AU; WIT 28-55K-H/HE/HU/A/AE/AU-US L2; WIT29.9-50K-XHU
+
+    # --- WIS large commercial 3-phase, no EPS ---
+    5800: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 210K
+    5801: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 215K-AM — V2.03 addition
 }
 
-# DTCs for which battery registers (31200+) are not applicable.
-_VPP_DTC_NO_BATTERY: frozenset = frozenset({5200, 5201})
+# DTCs for which battery registers (31200+) and energy storage registers are not applicable.
+# Per V2.03 spec note: "MIN-X & MOD/MID/MAC-X & MAX/MAX-X do not use battery/storage registers."
+_VPP_DTC_NO_BATTERY: frozenset = frozenset({
+    5000, 5001, 5002, 5003,   # MOD/MID/MAC-X
+    5200, 5201,                # MIC/MIN-X
+    5500, 5501, 5502,          # MAX
+    5600,                      # WIS 100K-AM
+})
 
 
 
