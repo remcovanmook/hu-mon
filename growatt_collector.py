@@ -184,7 +184,7 @@ def poll_datalogger(ip: str, port: int, store: GrowattStore):
                 reading.grid_l3_v = parse_u16(reg2[8]) / 10.0
                 reading.grid_l3_a = parse_u16(reg2[9]) / 10.0
                 
-            reading.fault_code = parse_u16(reg2[61])
+            reading.fault_code = parse_u16(reg2[75])  # 3105
             
             # Temperature is at 3094 and 3095 (shift of -20), which is reg2[64] and reg2[65]
             reading.inverter_temp = parse_u16(reg2[64]) / 10.0

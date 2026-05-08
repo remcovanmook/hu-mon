@@ -83,8 +83,8 @@ These registers are Read-Only and provide real-time telemetry.
 | 03 (Hold) | 3001-15 | New Serial | ASCII | — | — | 30-char Inverter Serial Number |
 | **SYSTEM STATE** | | | | | | |
 | 04 (Input) | 3000 | Inverter Status | U16 | — | 1 | 0:Wait, 1:Normal, 3:Fault |
-| 04 (Input) | 3091 | Fault Code | U16 | — | 1 | Main Error code (0 = None) |
-| 04 (Input) | 3092 | Warning Code | U16 | — | 1 | Warning bitmask |
+| 04 (Input) | 3105 | Fault Code | U16 | — | 1 | Main Error code (0 = None) |
+| 04 (Input) | 3106 | Warning Code | U16 | — | 1 | Warning bitmask |
 | 04 (Input) | 3094 | Inverter Temp | U16 | °C | 0.1 | Heat sink temperature (HU-Hybrid -20 Shift Profile) |
 | 04 (Input) | 3095 | Boost Temp | U16 | °C | 0.1 | Internal converter temperature (HU-Hybrid -20 Shift Profile) |
 | **PV INPUTS** | | | | | | |
@@ -201,7 +201,7 @@ The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3
 * **3**: Fault (Red LED active, system halted)
 * **4**: Flash (Firmware updating)
 
-### Fault Codes (Input Reg 3091)
+### Fault Codes (Input Reg 3105)
 * **201**: Leakage current too high
 * **202**: DC Isolation error
 * **300**: Grid AC voltage out of range
