@@ -202,6 +202,7 @@ class GrowattVppDriver(GrowattBaseDriver):
     def __init__(self) -> None:
         self._dtc_entry: Optional[_DtcEntry] = None
         self._has_eps: bool = False
+        self._vpp_protocol_version: int = 0   # from FC03 30099; 0 = unknown
 
     @property
     def driver_id(self) -> str:
@@ -256,8 +257,13 @@ class GrowattVppDriver(GrowattBaseDriver):
         unavailable registers.
 
         Register layout:
-          FC03 30000-30017  DTC + serial (first 2 words) + rated power
-          FC03 30001-30015  Serial number (15 words, 30-char ASCII)
+          FC03 30000-30099  Single block covering all Basic Parameter and
+                            Version Information registers:
+            30000           DTC (device type code)
+            30001-30015     Serial number (15 words, 30-char ASCII)
+            30016-30017     Rated power Pn (0.1 W)
+            30060-30061     Inverter type-model chars (ASCII, e.g. "TL" + "AA")
+            30099           VPP protocol version (201 = V2.01, 202 = V2.02 …)
           FC03 9-14         Firmware string (ShineWifi mirrors DSP fw here)
           FC03 1001         Battery type (0=none, 1=Li-ion)
           FC03 1005         Battery nominal capacity (0.1 kWh)
@@ -273,31 +279,49 @@ class GrowattVppDriver(GrowattBaseDriver):
         phases = 3
         rated_w = 0
 
-        # DTC + rated power (30000-30017, 18 registers in one read)
+        # DTC, rated power, model-type chars, VPP protocol version
+        # Read full Basic Parameter block 30000-30099 (100 registers) in one call.
         try:
-            r = client.read_holding_registers(30000, count=18, device_id=slave_id)
+            r = client.read_holding_registers(30000, count=100, device_id=slave_id)
             if not r.isError():
                 dtc = r.registers[0]
                 entry = _VPP_DTC_TABLE.get(dtc)
+                if entry is None:
+                    entry = _dtc_infer_entry(dtc)
                 pn_raw = _u32(r.registers[16], r.registers[17])
                 rated_w = int(pn_raw / 10.0)
-                if entry:
+
+                # 30060-30061: hardware model-type chars (e.g. 'TL' + 'AA')
+                # Each register encodes two ASCII chars (high byte, low byte).
+                def _ascii2(reg: int) -> str:
+                    hi, lo = (reg >> 8) & 0xFF, reg & 0xFF
+                    return "".join(chr(b) if 32 <= b < 127 else "" for b in (hi, lo))
+                model_type = _ascii2(r.registers[60]) + _ascii2(r.registers[61])
+                model_type = model_type.strip()
+
+                # 30099: VPP protocol version (e.g. 201 = V2.01)
+                vpp_ver = r.registers[99]
+                self._vpp_protocol_version = vpp_ver
+                vpp_ver_str = f"V{vpp_ver // 100}.{vpp_ver % 100:02d}" if vpp_ver else "unknown"
+
+                if entry and entry.series != "UNK":
                     model = _build_model_string(entry, rated_w)
                     has_eps = entry.has_eps
                     phases = entry.phases
                     logger.info(
-                        "read_device_info: DTC=%d → %s, rated_w=%dW, has_eps=%s",
-                        dtc, model, rated_w, has_eps,
+                        "read_device_info: DTC=%d → %s, rated_w=%dW, has_eps=%s"
+                        ", type=%r, vpp=%s",
+                        dtc, model, rated_w, has_eps, model_type, vpp_ver_str,
                     )
                 else:
                     logger.warning(
-                        "read_device_info: DTC %d unknown — using generic model name",
-                        dtc,
+                        "read_device_info: DTC %d unknown (inferred), type=%r, vpp=%s",
+                        dtc, model_type, vpp_ver_str,
                     )
             else:
-                logger.warning("read_device_info: FC03 30000-30017 error: %s", r)
+                logger.warning("read_device_info: FC03 30000-30099 error: %s", r)
         except Exception as exc:
-            logger.warning("read_device_info: FC03 30000-30017 exception: %s", exc)
+            logger.warning("read_device_info: FC03 30000-30099 exception: %s", exc)
 
         # Serial number (30001-30015, 15 words ASCII)
         serial = ""
@@ -343,9 +367,10 @@ class GrowattVppDriver(GrowattBaseDriver):
             except Exception as exc:
                 logger.warning("read_device_info: bat_nominal_kwh exception: %s", exc)
 
-        # Cache has_eps for use in read_registers (S5 gating)
+        # Cache has_eps and VPP protocol version for use in read_registers
         self._dtc_entry = entry
         self._has_eps = has_eps
+        # _vpp_protocol_version already set above (or stays 0 if block read failed)
 
         return DeviceInfo(
             model=model,
@@ -380,9 +405,14 @@ class GrowattVppDriver(GrowattBaseDriver):
 
         Per-string PV power: V × I (DC, no power factor).
         Grid voltages: L-N from Protocol II registers 3026/3030/3034 (S0).
-          If S0 fails, falls back to VPP L-L registers 31106-31108 ÷ √3
-          (approximation valid only for a balanced system).
+          If S0 fails, falls back to VPP L-L registers 31106-31108 via
+          phasor triangle geometry (_ll_to_ln).
         Per-phase AC power: V_LN × I × PF where PF = P / |S|.
+
+        Version-gated behaviour: ``self._vpp_protocol_version`` (from FC03
+        30099, set by ``read_device_info``) can be used to select different
+        register maps for V2.00 vs V2.01 vs V2.02 devices.  No branching is
+        currently active; the field is available for future use.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
