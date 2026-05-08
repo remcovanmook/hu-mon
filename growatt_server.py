@@ -3,7 +3,9 @@ import logging
 import threading
 import time
 
+from growatt.drivers.registry import auto_select
 from growatt.store import GrowattStore
+from pymodbus.client import ModbusTcpClient
 from growatt_collector import poll_datalogger
 from growatt_modbus_server import run as run_modbus_server
 from dashboard.app import create_app
@@ -34,15 +36,33 @@ def main():
     parser.add_argument("--influx-org", default="")
     parser.add_argument("--influx-bucket", default="")
     parser.add_argument("--influx-db", default="growatt")
-    
+
+    # Driver override (optional — auto-detected by default)
+    parser.add_argument(
+        "--driver",
+        default=None,
+        metavar="DRIVER_ID",
+        help="Force a specific driver ID (e.g. growatt_mod_hu). Default: auto-detect.",
+    )
+
     args = parser.parse_args()
 
     store = GrowattStore(args.db)
+
+    # Run the probe pipeline once to select the driver and get the proxy config.
+    # The collector will re-use the same driver internally (sticky session).
+    probe_client = ModbusTcpClient(args.device_ip, port=args.datalogger_port)
+    probe_client.connect()
+    driver, slave_id = auto_select(probe_client, force_driver_id=args.driver)
+    proxy_cfg = driver.proxy_config
+    probe_client.close()
+    logger.info("Driver: %s  Proxy ranges: %s", driver.driver_id, proxy_cfg.ranges)
 
     # 1. Start Collector thread
     threading.Thread(
         target=poll_datalogger,
         args=(args.device_ip, args.datalogger_port, store),
+        kwargs={"driver_id": driver.driver_id},
         daemon=True,
         name="growatt-collector"
     ).start()
@@ -51,11 +71,11 @@ def main():
     # 2. Start Modbus proxy server thread
     threading.Thread(
         target=run_modbus_server,
-        args=(store, args.proxy_port),
+        args=(store, proxy_cfg, args.proxy_port),
         daemon=True,
         name="growatt-proxy"
     ).start()
-    logger.info("Modbus proxy server started on port %d", args.proxy_port)
+    logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, proxy_cfg.slave_id)
 
     # 3. Start MQTT Exporter (Optional)
     if args.mqtt_host:

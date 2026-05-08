@@ -34,7 +34,7 @@ import time
 
 from pymodbus.exceptions import ModbusIOException
 
-from growatt.drivers.base import BaseDriver, DeviceInfo, ProbeContext
+from growatt.drivers.base import BaseDriver, DeviceInfo, ProbeContext, ProxyConfig
 from modbus.codec import ascii_regs
 from growatt.drivers.growatt_base import (
     GROWATT_SERIES,
@@ -130,6 +130,28 @@ class GrowattModHuDriver(GrowattBaseDriver):
     @property
     def driver_id(self) -> str:
         return "growatt_mod_hu"
+
+    @property
+    def proxy_config(self) -> ProxyConfig:
+        """
+        Return the Modbus address space the proxy server should expose for
+        this driver.
+
+        slave_id is 1 (the standard Growatt default; the actual confirmed
+        slave_id from the probe is passed separately at runtime, but the
+        proxy advertises the same ID).
+
+        function_codes covers FC 03 (holding, for metadata reads) and
+        FC 04 (input, for all telemetry segments).
+
+        ranges is derived directly from SEGMENTS so the proxy address space
+        always matches what the collector actually polls.
+        """
+        return ProxyConfig(
+            slave_id=1,
+            function_codes={3, 4},
+            ranges=[(start, count) for _, start, count in SEGMENTS],
+        )
 
     def _probe_series(self, ctx: ProbeContext) -> bool:
         """

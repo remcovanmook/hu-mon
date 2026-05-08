@@ -16,7 +16,7 @@ the context.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional, Tuple
 
 # Forward-declared as a string to avoid a circular import; the actual class
 # lives in growatt.reading.
@@ -68,6 +68,27 @@ class ProbeContext:
     max_block_size: int
 
 
+@dataclass
+class ProxyConfig:
+    """
+    Describes the Modbus address space the proxy server should expose.
+
+    Derived from the selected driver and passed to the proxy server at
+    startup.  The proxy uses this to build its register data block and
+    determine which reads to serve.
+
+    Attributes:
+        slave_id:        Modbus slave ID the proxy advertises.
+        function_codes:  Set of FC numbers the proxy handles (e.g. {3, 4}).
+        ranges:          List of (start_address, count) tuples defining every
+                         contiguous register block the proxy must be able to
+                         answer.  Derived directly from the driver's SEGMENTS.
+    """
+    slave_id: int
+    function_codes: set
+    ranges: List[Tuple[int, int]]  # (start_address, count)
+
+
 class BaseDriver(ABC):
     """
     Abstract base class for all device drivers.
@@ -76,6 +97,7 @@ class BaseDriver(ABC):
     - How to confirm it is talking to a device it understands (probe).
     - How to read one-time static metadata (read_device_info).
     - How to execute a full telemetry poll cycle (read_registers).
+    - Which Modbus address space the proxy server should expose (proxy_config).
 
     Drivers must be stateless with respect to connection objects.  The Modbus
     client and slave_id are passed explicitly on every call so the same driver
@@ -127,4 +149,18 @@ class BaseDriver(ABC):
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address from ProbeContext.
+        """
+
+    @property
+    @abstractmethod
+    def proxy_config(self) -> ProxyConfig:
+        """
+        Return the Modbus address space this driver expects the proxy to serve.
+
+        Called once after probe() succeeds.  The proxy server uses this to
+        build its register data block (slave ID, supported FCs, address ranges)
+        instead of hardcoding device-specific values.
+
+        Implementations should derive ranges directly from their SEGMENTS
+        constant so the proxy and the collector stay in sync automatically.
         """

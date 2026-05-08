@@ -290,5 +290,31 @@ class TestReadRegistersShifted(unittest.TestCase):
         self.assertAlmostEqual(reading.grid_l1_a, 12.0)
 
 
+# ---------------------------------------------------------------------------
+# Tests: proxy_config
+# ---------------------------------------------------------------------------
+
+class TestProxyConfig(unittest.TestCase):
+
+    def test_slave_id(self):
+        cfg = GrowattModHuDriver().proxy_config
+        self.assertEqual(cfg.slave_id, 1)
+
+    def test_function_codes(self):
+        cfg = GrowattModHuDriver().proxy_config
+        self.assertIn(3, cfg.function_codes)
+        self.assertIn(4, cfg.function_codes)
+
+    def test_ranges_match_segments(self):
+        from growatt.drivers.growatt_mod_hu.driver import SEGMENTS
+        cfg = GrowattModHuDriver().proxy_config
+        expected = [(start, count) for _, start, count in SEGMENTS]
+        self.assertEqual(cfg.ranges, expected)
+
+    def test_ranges_non_empty(self):
+        cfg = GrowattModHuDriver().proxy_config
+        self.assertGreater(len(cfg.ranges), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

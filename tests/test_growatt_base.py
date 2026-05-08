@@ -10,7 +10,7 @@ minimal concrete subclass that stubs out the abstract methods.
 
 import unittest
 
-from growatt.drivers.base import ProbeContext
+from growatt.drivers.base import ProbeContext, ProxyConfig
 from growatt.drivers.growatt_base import (
     GrowattBaseDriver,
     _s16,
@@ -44,6 +44,10 @@ class _StubDriver(GrowattBaseDriver):
 
     def read_registers(self, client, slave_id):
         raise NotImplementedError
+
+    @property
+    def proxy_config(self):
+        return ProxyConfig(slave_id=1, function_codes={3, 4}, ranges=[])
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +173,8 @@ class TestProbe(unittest.TestCase):
             def _probe_series(self, ctx): raise RuntimeError("boom")
             def read_device_info(self, c, s): raise NotImplementedError
             def read_registers(self, c, s): raise NotImplementedError
+            @property
+            def proxy_config(self): return ProxyConfig(slave_id=1, function_codes={3, 4}, ranges=[])
 
         block = _make_block(series_code=0x0B)
         ctx = _make_ctx(block)

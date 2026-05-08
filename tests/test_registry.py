@@ -10,7 +10,7 @@ auto_select() behaviour including the --driver force override.
 import unittest
 from unittest.mock import MagicMock, call
 
-from growatt.drivers.base import BaseDriver, DeviceInfo, ProbeContext
+from growatt.drivers.base import BaseDriver, DeviceInfo, ProbeContext, ProxyConfig
 from growatt.drivers.registry import (
     DRIVER_REGISTRY,
     _BLOCK_CHUNK_SIZES,
@@ -47,6 +47,8 @@ def _mock_driver(driver_id="mock", probe_result=True):
         def probe(self, ctx): return probe_result
         def read_device_info(self, c, s): raise NotImplementedError
         def read_registers(self, c, s): raise NotImplementedError
+        @property
+        def proxy_config(self): return ProxyConfig(slave_id=1, function_codes={3, 4}, ranges=[])
     return _MockDriver
 
 
