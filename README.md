@@ -20,32 +20,52 @@ A Modbus TCP proxy and telemetry collector for the Growatt MOD 12KTL3-HU inverte
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repo_url>
-cd growatt
+# Clone the repository to /opt
+sudo git clone https://github.com/remcovanmook/growatt /opt/growatt
+cd /opt/growatt
 
 # Create virtual environment 
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+sudo python3 -m venv .venv
+sudo .venv/bin/pip install -r requirements.txt
 ```
+
+Create the database directory and a system user:
+
+```bash
+sudo useradd -r -s /bin/false growatt
+sudo mkdir -p /var/lib/growatt
+sudo chown growatt:growatt /var/lib/growatt
+sudo cp /opt/growatt/etc/default/growatt /etc/default/growatt
+```
+
+Edit `/etc/default/growatt` to set `GROWATT_DEVICE_IP` to your inverter's IP address.
 
 ## Running the Server
 
-Start the full stack (Collector, Proxy, Dashboard, Metrics) by pointing it at your inverter's IP address:
+### Development (Single Command)
+
+Start the full stack (Collector, Proxy, Dashboard, Metrics) manually:
 
 ```bash
-.venv/bin/python growatt_server.py --device-ip <INVERTER_IP>
+.venv/bin/python growatt_server.py --device-ip <INVERTER_IP> --db db/growatt.db
 ```
 
-**Options:**
-- `--device-ip`: (Required) The IP of your Growatt datalogger.
-- `--datalogger-port`: Defaults to 502.
-- `--proxy-port`: The port the local mimic proxy will listen on (default 5020).
-- `--http-port`: The port for the web dashboard and metrics (default 8080).
-- `--db`: SQLite database file (default `growatt.db`).
+### systemd (Recommended for Production)
+
+Deploy the all-in-one daemon to run in the background:
+
+```bash
+sudo cp /opt/growatt/etc/systemd/growatt.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now growatt
+sudo systemctl status growatt
+```
+
+**Options for CLI/Environment overrides:**
+- `GROWATT_DEVICE_IP` / `--device-ip`: (Required) The IP of your Growatt datalogger.
+- `GROWATT_PROXY_PORT` / `--proxy-port`: Local proxy listening port (default 5020).
+- `GROWATT_HTTP_PORT` / `--http-port`: Web dashboard/metrics port (default 8080).
+- `GROWATT_DB` / `--db`: SQLite database file (default `growatt.db`).
 
 **MQTT Integration (Optional):**
 - `--mqtt-host`: MQTT broker IP. (Requires `pip install aiomqtt`)

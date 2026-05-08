@@ -1,0 +1,14 @@
+# Growatt Modbus Proxy Defaults
+# Environment variables for the systemd service
+
+# REQUIRED: The IP address of the ShineWifi datalogger
+GROWATT_DEVICE_IP=172.28.2.36
+
+# SQLite database path
+GROWATT_DB=/var/lib/growatt/growatt.db
+
+# Proxy Port (default 5020)
+GROWATT_PROXY_PORT=5020
+
+# Dashboard / HTTP Port (default 8080)
+GROWATT_HTTP_PORT=8080

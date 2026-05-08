@@ -1,0 +1,25 @@
+[Unit]
+Description=Growatt Modbus Proxy & Telemetry Server
+Documentation=https://github.com/remcovanmook/growatt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=growatt
+Group=growatt
+WorkingDirectory=/opt/growatt
+Environment=GROWATT_DB=/var/lib/growatt/growatt.db
+Environment=GROWATT_PROXY_PORT=5020
+Environment=GROWATT_HTTP_PORT=8080
+ExecStart=/opt/growatt/.venv/bin/python /opt/growatt/growatt_server.py \
+    --device-ip ${GROWATT_DEVICE_IP} \
+    --db ${GROWATT_DB} \
+    --proxy-port ${GROWATT_PROXY_PORT} \
+    --http-port ${GROWATT_HTTP_PORT}
+EnvironmentFile=-/etc/default/growatt
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
