@@ -236,6 +236,11 @@ class GrowattVppDriver(GrowattBaseDriver):
         # Populated by read_device_info from FC03 30099.
         # 201 = V2.01 (spec doc version), 202 = V2.02 (seen on MOD 12KTL3-HU).
         # Use this to gate register-map differences between protocol generations.
+        self._static_regs: dict = {}
+        # FC03 holding register snapshot (0-124 and 30000-30099) keyed by
+        # absolute address string, e.g. {"0": 1, "44": 2051, "30000": 5401}.
+        # Populated once by read_device_info and merged into every raw_payload
+        # so the proxy serves correct values for all claimed FC03 ranges.
 
     @property
     def driver_id(self) -> str:
@@ -328,11 +333,16 @@ class GrowattVppDriver(GrowattBaseDriver):
         phases = 3
         rated_w = 0
 
+        # ---------------------------------------------------------------
         # DTC, rated power, model-type chars, VPP protocol version
         # Read full Basic Parameter block 30000-30099 (100 registers) in one call.
         try:
             r = client.read_holding_registers(30000, count=100, device_id=slave_id)
             if not r.isError():
+                # Seed proxy static register cache for FC03 30000-30099.
+                for i, v in enumerate(r.registers):
+                    self._static_regs[str(30000 + i)] = v
+
                 dtc = r.registers[0]
                 entry = _VPP_DTC_TABLE.get(dtc)
                 if entry is None:
@@ -440,6 +450,19 @@ class GrowattVppDriver(GrowattBaseDriver):
                 logger.debug("read_device_info: FC03 reg 44 unavailable — keeping DTC-inferred phases=%d", phases)
         except Exception as exc:
             logger.warning("read_device_info: FC03 reg 44 exception: %s", exc)
+
+        # FC03 0-124: base holding block — firmware, DTC, RTC, TP, grid thresholds.
+        # Read once here so the proxy can serve this range.  The data is static;
+        # no need to re-read on every poll cycle.
+        try:
+            r = client.read_holding_registers(0, count=125, device_id=slave_id)
+            if not r.isError():
+                for i, v in enumerate(r.registers):
+                    self._static_regs[str(i)] = v
+            else:
+                logger.debug("read_device_info: FC03 0-124 error: %s", r)
+        except Exception as exc:
+            logger.debug("read_device_info: FC03 0-124 exception: %s", exc)
 
         # Cache has_eps and VPP protocol version for use in read_registers
         self._dtc_entry = entry
@@ -658,7 +681,11 @@ class GrowattVppDriver(GrowattBaseDriver):
         reading.load_p = reading.pv_total_w - reading.meter_total_w - reading.bat_p
 
         # --- Raw register snapshot for the Modbus proxy ---
-        raw: dict = {}
+        # Start with static holding register snapshot (FC03 0-124 and 30000-30099)
+        # populated by read_device_info.  Dynamic FC04 poll values are added on
+        # top; keys don't overlap so no dynamic data is overwritten.
+        raw: dict = dict(self._static_regs)
+
         if s0:
             for i, v in enumerate(s0):
                 raw[str(3026 + i)] = v

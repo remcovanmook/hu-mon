@@ -73,7 +73,12 @@ _SANITY_CHECKS = [
     (4, 31100, 14, None, 0.1, "°C",   "Inverter temp",        5.0,  90.0),
     # Active power: FC04 31100-31101, u32, 0.1 W, signed (pos=export)
     # We just check the pair is readable; sign and value not bounded tightly
-    (4, 31000, 0, None, 1.0,  "code", "Working state (0-7)",  0.0,  7.0),
+    # Working state: FC04 31000, per VPP spec states 0-9:
+    # 0=standby 1=self-test 2=reserved 3=fault 4=upgrade
+    # 5=PV+bat-offline 6=bat+PV-online 7=PV+bat-offgrid
+    # 8=bat-online-PV-offline 9=bypass
+    (4, 31000, 0, None, 1.0,  "code", "Working state (0-9)",  0.0,  9.0),
+
 ]
 
 
