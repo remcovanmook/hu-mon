@@ -462,7 +462,11 @@ class GrowattVppDriver(GrowattBaseDriver):
             reading.grid_l1_v, reading.grid_l2_v, reading.grid_l3_v = _ll_to_ln(v_rs, v_st, v_tr)
 
         # VPP meter power: pos=import from grid → invert for GrowattReading (pos=export)
-        reading.meter_total_w = -(_s32(s2[12], s2[13]) / 10.0)   # 31112-31113
+        # Grid power: inverter AC output at 31100-31101 (pos = export to grid).
+        # Register 31112-31113 (smart meter net power) would be more accurate for
+        # net import/export, but requires a CT clamp that is not installed here.
+        # Without a meter, the inverter AC output IS the grid exchange value.
+        reading.meter_total_w = ac_active_w   # 31100-31101
 
         reading.inverter_temp = _s16(s2[14]) / 10.0   # 31114
 

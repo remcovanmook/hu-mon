@@ -535,7 +535,7 @@ function connectSSE() {
             updateDOM("sum-bat-autonomy", "—");
         }
         
-        updateDOM("sum-load", d.load_p.toFixed(0));
+        updateDOM("sum-load", d.eps_p.toFixed(0));
         updateDOM("sum-load-today", "—");
         
         // Explicitly ignoring L1/L2/L3 house load splits since we cannot derive them purely from the Modbus data without assumptions
@@ -649,7 +649,7 @@ function connectSSE() {
         updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
         updateDOM("flow-grid", Math.abs(d.meter_total_w).toFixed(0) + " W");
         updateDOM("flow-bat", Math.abs(d.bat_p).toFixed(0) + " W");
-        updateDOM("flow-load", d.load_p.toFixed(0) + " W");
+        updateDOM("flow-load", d.eps_p.toFixed(0) + " W");
 
         const lPvInv = document.getElementById("line-pv-inv");
         const lInvGrid = document.getElementById("line-inv-grid");
@@ -680,7 +680,7 @@ function connectSSE() {
             }
         }
         if(lInvLoad) {
-            lInvLoad.classList.toggle("active", d.load_p > 10);
+            lInvLoad.classList.toggle("active", d.eps_p > 10);
         }
 
         // Overview Totals (Row under chart)
