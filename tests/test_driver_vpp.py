@@ -116,9 +116,10 @@ class TestProbeSeriesVPP(unittest.TestCase):
         ctx = _make_ctx(vpp_dtc=None)
         self.assertFalse(self.driver._probe_series(ctx))
 
-    def test_unknown_dtc_rejected(self):
+    def test_unknown_dtc_accepted_via_heuristic(self):
+        """Unknown DTC codes are accepted and inferred, not hard-rejected."""
         ctx = _make_ctx(vpp_dtc=9999)
-        self.assertFalse(self.driver._probe_series(ctx))
+        self.assertTrue(self.driver._probe_series(ctx))
 
     def test_all_known_dtcs_accepted(self):
         for dtc in _VPP_DTC_TABLE:

@@ -118,11 +118,14 @@ class _DtcEntry:
 _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     # Source: VPP Communication Protocol V2.01, Table 3-1
     #
-    # Encoding convention (5xxx family):
-    #   last two digits == 00  →  XH variant  (no EPS / battery)
-    #   last two digits == 01  →  HU variant  (has EPS / battery)
-    # Exceptions: 5200/5201 use the last digit for power-range, not EPS;
-    #             3xxx codes use a different family-encoding scheme.
+    # DTC structure: [family (first 2 digits)] [variant (last 2 digits)]
+    #   Family identifies the product line (54=MOD/MID, 56=WIT, 58=WIS,
+    #           51=MIN-XH, 52=MIC/MIN-X, 36=SPH-3ph, 37=SPA-3ph, ...)
+    #   Variant encodes the feature set within that family:
+    #           00  →  XH / no EPS / no battery
+    #           01  →  HU / hybrid (EPS + battery)
+    #   Exception: 52xx uses the variant digit for power range (5200=low,
+    #              5201=high), not EPS presence. 3xxx use different encoding.
     3502: _DtcEntry("SPH", False, 1),   # SPH 3000-6000TL BL       (1-phase, no EPS)
     3601: _DtcEntry("SPH", True,  3),   # SPH 4000-10000TL3 BH-UP  (3-phase, EPS)
     3725: _DtcEntry("SPA", True,  3),   # SPA 4000-10000TL3 BH-UP  (3-phase, EPS)
