@@ -7,6 +7,15 @@ This document provides the full technical specification for interacting with the
 **Protocol Version:** Growatt Modbus RTU Protocol II (Storage/Hybrid v7.6+)  
 **Port:** `502`
 
+> **Hardware verification note (2026-05-08):**  
+> The FC03 holding register space at addresses **0–124** is the ShineWifi-X2's **own configuration space**, not a bridge to the inverter's Protocol II holding registers.  The non-zero values observed at FC03 0–124 include ShineWifi firmware strings, datalogger timestamps, and ShineWifi config — not inverter data.  
+> As a consequence:
+> - `Module ID` (FC03 regs 28–29) reads as **0** on the live device. Model/power cannot be decoded from this address.
+> - `Device Type` (FC03 reg 121) reads as **120 (0x78)** — not a valid Protocol II device type.
+> - `Firmware Ver` (FC03 regs 9–14) decodes correctly as the **inverter DSP firmware** (e.g. `D01.0ZBDC`), which the ShineWifi mirrors at these addresses.
+> - FC03 addresses **outside** 0–124 (e.g. 1001, 1005, 3001–3015) **may** bridge to the inverter. Status unconfirmed — check server log at startup.
+> - FC04 input registers at 3000+ bridge to the inverter correctly and are the reliable data source.
+
 ## 1. Connection Parameters
 | Parameter | Value | Notes |
 | :--- | :--- | :--- |
@@ -77,10 +86,12 @@ These registers are Read-Only and provide real-time telemetry.
 | Function Code | Address | Name | Type | Unit | Scale | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **METADATA** | *(Read Once)* | | | | | |
-| 03 (Hold) | 9–14 | Firmware Ver | U16×6 | — | — | System Firmware versions |
-| 03 (Hold) | 28–29 | Module ID | U32 | — | — | Algorithmic Series + Power ID |
-| 03 (Hold) | 121 | Device Type | U16 | — | — | 6: Storage/Hybrid |
-| 03 (Hold) | 3001-15 | New Serial | ASCII | — | — | 30-char Inverter Serial Number |
+| 03 (Hold) | 9–14 | Firmware Ver | U16×6 | — | — | Inverter DSP firmware string (e.g. `D01.0ZBDC`). **Confirmed**: ShineWifi mirrors this correctly at these addresses. |
+| 03 (Hold) | 28–29 | Module ID | U32 | — | — | Algorithmic Series + Power ID. **Not accessible**: reads 0 on live hardware — ShineWifi does not bridge Protocol II holding registers at 0–124. |
+| 03 (Hold) | 121 | Device Type | U16 | — | — | 6: Storage/Hybrid. **Not accessible**: reads 120 (ShineWifi config) on live hardware. |
+| 03 (Hold) | 1001 | Battery Type | U16 | — | — | 1: Lithium APX. **Unconfirmed**: outside ShineWifi own space (0–124); may bridge to inverter. |
+| 03 (Hold) | 1005 | Nominal Energy | U16 | kWh | 0.1 | Battery nominal kWh. **Unconfirmed**: same as above. |
+| 03 (Hold) | 3001–15 | New Serial | ASCII | — | — | 30-char inverter serial. **Unconfirmed**: outside ShineWifi own space; may bridge to inverter. |
 | **SYSTEM STATE** | | | | | | |
 | 04 (Input) | 3000 | Inverter Status | U16 | — | 1 | 0:Wait, 1:Normal, 3:Fault |
 | 04 (Input) | 3094 | Inverter Temp | U16 | °C | 0.1 | Heat sink temperature (HU-Hybrid -20 Shift Profile) |
@@ -168,7 +179,16 @@ These registers are Read-Only and provide real-time telemetry.
 
 ## 6. Device Identification & Status
 ### Algorithmic Model Decoding (Holding Reg 28-29)
-The inverter's exact model name and power rating are not stored as ASCII. Instead, they are algorithmically encoded in a 32-bit integer spread across Holding Registers `28` and `29` (Function Code 03):
+
+> **Not accessible on ShineWifi-X2 firmware observed in the field.**  
+> FC03 registers 28–29 return 0 on live hardware. The ShineWifi's own config occupies FC03 0–124. Do not attempt to decode module_id from these addresses.
+>
+> Alternative sources under investigation:
+> - VPP holding register 30000 (DTC code) — see `docs/2.1.GROWATT.VPP.COMMUNICATION.PROTOCOL.OF.INVERTER_V2.01.md`
+> - FC03 reg 3001–3015 (serial) — status unconfirmed, may bridge
+
+The encoding is documented here for reference (applies when module_id is non-zero, e.g. when accessed through a direct RS485 connection rather than ShineWifi TCP bridge).
+
 1. Compute `module_id = (Reg[28] << 16) | Reg[29]`
 2. Extract the Series Code (Upper 16 bits): `series_code = (module_id >> 16) & 0xFFFF`
 3. Extract the Power Rating (Lower 16 bits): `power_watts = module_id & 0xFFFF`
