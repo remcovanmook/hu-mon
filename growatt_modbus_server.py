@@ -48,14 +48,20 @@ def run(store: GrowattStore, proxy_cfg: ProxyConfig, port: int = 5020):
         sim_blocks = []
         for fc, ranges in fc_map.items():
             for start, count in ranges:
-                sim_blocks.append(
-                    SimData(
-                        address=start,
-                        count=count,
-                        values=[0] * count,
-                        datatype=DataType.REGISTERS,
+                for addr in range(start, start + count):
+                    # PyModbus SimDevice's overlap check advances last_address by
+                    # count² (len(build_registers) × count), so a single SimData
+                    # with count=N consumes N² address slots. Using count=1 per
+                    # address avoids spurious overlap errors across non-contiguous
+                    # ranges (e.g. 3049-3095 and 31000-31059).
+                    sim_blocks.append(
+                        SimData(
+                            address=addr,
+                            count=1,
+                            values=[0],
+                            datatype=DataType.UINT16,
+                        )
                     )
-                )
 
         async def update_registers(func_code, start_address, address, count, registers, values):
             """
