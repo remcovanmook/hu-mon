@@ -71,6 +71,12 @@ class ProbeContext:
     Contains inverter-side data (status, PV power) from Protocol II address
     space, which the ShineWifi-X2 bridges correctly unlike FC 03."""
 
+    vpp_dtc: Optional[int] = field(default=None)
+    """Device Type Code from VPP holding register 30000 (FC 03), or None if
+    the register was unavailable or returned zero.  Non-None means the device
+    supports VPP Protocol V2.01 or later and is a valid target for
+    GrowattVppDriver."""
+
 
 @dataclass
 class ProxyConfig:

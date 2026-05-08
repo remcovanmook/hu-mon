@@ -1,7 +1,7 @@
 """
 growatt.drivers.registry
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Device driver registry and the four-stage probe pipeline.
+Device driver registry and the five-stage probe pipeline.
 
 Probe pipeline (runs once at startup, not on reconnect)
 -------------------------------------------------------
@@ -12,17 +12,22 @@ Stage 2 — Function code support
     Tests FC 03 (holding) and FC 04 (input) individually.  Records which
     codes are available; drivers that require an absent FC are skipped.
 
-Stage 3 — Holding block read (chunked with fallback)
-    Attempts to read Holding Registers 0–124 in progressively smaller
-    chunk sizes: 125 → 64 → 32 → 16.  The first size that succeeds is
-    recorded in ProbeContext.max_block_size.  Remaining registers are read
-    in further requests of the same size and concatenated.  If all sizes
-    fail, holding_block is left as None.
+Stage 3 — ShineWifi holding block (FC 03, 0–124)
+    Contains ShineWifi-X2 own registers (firmware, config, timestamp).
+    Not used for inverter identity but cached for proxy consumers.
+
+Stage 3b — Inverter input block (FC 04, 3000–3029)
+    ShineWifi bridges these to the actual inverter. Used by GrowattBaseDriver
+    to confirm vendor identity via the Protocol II status register.
+
+Stage 3c — VPP DTC (FC 03, 30000)
+    Reads Device Type Code from the VPP holding register space.  Non-zero
+    means VPP Protocol V2.01+ is supported.  Stored in ctx.vpp_dtc and used
+    by GrowattVppDriver._probe_series().
 
 Stage 4 — Driver matching
     Iterates DRIVER_REGISTRY in order.  Returns the first driver whose
-    probe() returns True.  Registry is flat; two-tier logic is internal
-    to each driver hierarchy.
+    probe() returns True.
 
 Adding a new driver
 -------------------
@@ -35,6 +40,7 @@ from typing import Optional, Tuple
 
 from growatt.drivers.base import BaseDriver, ProbeContext
 from growatt.drivers.growatt_mod_hu.driver import GrowattModHuDriver
+from growatt.drivers.growatt_vpp.driver import GrowattVppDriver
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +56,11 @@ _BLOCK_CHUNK_SIZES = [125, 64, 32, 16]
 
 # ---------------------------------------------------------------------------
 # Driver registry — probe priority order matters.
-# More-specific drivers should appear before catch-all ones.
+# VPP driver first: takes precedence when DTC register 30000 responds.
+# GrowattModHuDriver is the fallback for older firmware without VPP.
 # ---------------------------------------------------------------------------
 DRIVER_REGISTRY: list = [
+    GrowattVppDriver,
     GrowattModHuDriver,
 ]
 
@@ -210,12 +218,27 @@ def auto_select(
         except Exception as exc:
             logger.warning("Input block 3000-3029 exception: %s", exc)
 
+    # Stage 3c: VPP DTC (FC 03, register 30000).
+    # A non-zero value confirms VPP Protocol V2.01+ support.
+    vpp_dtc = None
+    if 3 in supported_fcs:
+        try:
+            r = client.read_holding_registers(30000, count=1, device_id=slave_id)
+            if not r.isError() and r.registers[0] != 0:
+                vpp_dtc = r.registers[0]
+                logger.info("VPP DTC: %d (0x%04X)", vpp_dtc, vpp_dtc)
+            else:
+                logger.debug("VPP DTC: register 30000 returned zero or error")
+        except Exception as exc:
+            logger.debug("VPP DTC read failed: %s", exc)
+
     ctx = ProbeContext(
         slave_id=slave_id,
         supported_fcs=supported_fcs,
         holding_block=holding_block,
         max_block_size=max_block_size,
         input_block=input_block,
+        vpp_dtc=vpp_dtc,
     )
 
     if holding_block:
