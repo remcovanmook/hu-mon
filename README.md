@@ -1,16 +1,16 @@
 # Growatt Modbus Proxy
 
-A resilient, high-performance Modbus TCP proxy and telemetry collector for the Growatt MOD 12KTL3-HU inverter (via ShineWifi-X2).
+A Modbus TCP proxy and telemetry collector for the Growatt MOD 12KTL3-HU inverter (via ShineWifi-X2).
 
 ## Features
-- **Strict 5s Polling:** Hardware-accurate telemetry extraction.
-- **Aggressive Reconnect:** Instantly recovers from datalogger socket closures.
-- **Hardware-Accurate Telemetry:** Extracts elusive metrics including APX battery data, EPS Backup power flows, and grid frequencies.
-- **Thermal Visibility:** Integrates reverse-engineered register shifts to track Inverter and Boost temperatures live.
-- **Web Dashboard:** A high-performance, live-updating frontend powered by Server-Sent Events (SSE). Features include responsive SVG sparklines, zero-filled historical extrapolation, EPS/Grid dynamic axis synchronization, and dark mode.
-- **Transparent Proxy:** Mimics the inverter to allow third-party systems (like Home Assistant) to poll at unlimited frequencies without crashing the datalogger.
-- **Prometheus Metrics:** Native `/metrics` endpoint for integration into Grafana stacks.
-- **Tiered SQLite Backend:** Lock-free, WAL-mode database gracefully managing high-frequency rolling averages for 1-minute and 1-hour historical chart retention.
+- **5s Polling:** Telemetry extraction.
+- **Reconnect:** Recovers from datalogger socket closures.
+- **Telemetry:** Extracts APX battery data, EPS Backup power flows, and grid frequencies.
+- **Thermal Visibility:** Tracks Inverter and Boost temperatures.
+- **Web Dashboard:** Frontend powered by Server-Sent Events (SSE). Features include SVG sparklines, historical extrapolation, EPS/Grid axis synchronization, and dark mode.
+- **Transparent Proxy:** Mimics the inverter to allow third-party systems (like Home Assistant) to poll without querying the datalogger directly.
+- **Prometheus Metrics:** Native `/metrics` endpoint.
+- **SQLite Backend:** WAL-mode database managing rolling averages for 1-minute and 1-hour historical charts.
 
 ## Requirements
 - Python 3.10+
@@ -70,5 +70,5 @@ To quickly test connectivity to your datalogger without launching the DB:
 ```
 
 ## Dashboard
-- Navigate to `http://<HOST>:8080/` to view the live dynamic dashboard. 
+- Navigate to `http://<HOST>:8080/` to view the dashboard. 
 - Navigate to `http://<HOST>:8080/metrics` for Prometheus scraping.
