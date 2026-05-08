@@ -154,12 +154,24 @@ class TestDecodeModel(unittest.TestCase):
 class TestReadDeviceInfo(unittest.TestCase):
 
     def _make_client(self, bat_type=1):
+        """
+        Build a mock Modbus client for read_device_info tests.
+
+        Registers are returned in the order read_device_info calls them:
+        1. FC03 0-124:   Full holding block (125 registers, module_id at 28-29)
+        2. FC03 3001-15: Serial number (15 registers)
+        3. FC03 1001:    Battery type
+        4. FC03 1005:    Battery nominal kWh
+        """
         client = MagicMock()
+        meta_block = _make_holding_block(series_code=0x0B, power=12000, device_type=6)
+        # Extend to 125 registers so all index accesses are in range.
+        meta_block = (meta_block + [0] * 125)[:125]
         client.read_holding_registers.side_effect = [
-            _mock_registers([bat_type]),             # Reg 1001: battery type
-            _mock_registers([50]),                   # Reg 1005: bat 5.0 kWh
-            _mock_registers(_make_holding_block()),  # Reg 0–124
-            _mock_registers([0x4142] * 15),          # Reg 3001–3015 (serial)
+            _mock_registers(meta_block),                 # FC03 0-124: meta block
+            _mock_registers([0x4142] * 15),              # FC03 3001-15: serial
+            _mock_registers([bat_type]),                 # FC03 1001: battery type
+            _mock_registers([50]),                       # FC03 1005: bat 5.0 kWh
         ]
         return client
 

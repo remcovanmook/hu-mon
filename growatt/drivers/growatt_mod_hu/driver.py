@@ -207,50 +207,86 @@ class GrowattModHuDriver(GrowattBaseDriver):
         """
         Read one-time static metadata from the device.
 
-        Reads:
-        - Holding 1001: battery type (0 = none, 1 = Lithium APX)
-        - Holding 1005: battery nominal energy (kWh × 0.1)
-        - Holding 0–124: firmware string, module_id, device type
-        - Holding 3001–3015: 30-character inverter serial number
+        Each register read is attempted independently.  A failure on any one
+        read is logged and a safe default is used rather than aborting startup.
+        This is necessary because the ShineWifi-X2 FC03 holding registers
+        0-124 are the ShineWifi's own config space (not the inverter's), so
+        module_id (regs 28-29) and device_type (reg 121) cannot be read from
+        the standard Protocol II path on this hardware.
 
-        pv_strings is not set: no register in Protocol II reports the number
-        of MPPT inputs configured on this unit.
+        Reads attempted:
+        - FC03 0-124:   Firmware string at regs 9-14.
+        - FC03 3001-15: 30-char serial (outside ShineWifi own space; bridges
+                        to inverter on most firmware versions).
+        - FC03 1001:    Battery type.
+        - FC03 1005:    Battery nominal energy.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
-        :raises ModbusIOException: If any register read fails.
         """
-        # Battery type — determines whether a battery is actually configured.
-        r_bat_type = client.read_holding_registers(_REG_BATTERY_TYPE, count=1, device_id=slave_id)
-        if r_bat_type.isError():
-            raise ModbusIOException("Failed to read battery type (Reg 1001)")
-        battery_configured = r_bat_type.registers[0] != 0
-
-        # Battery nominal capacity
-        r_bat = client.read_holding_registers(1005, count=1, device_id=slave_id)
-        if r_bat.isError():
-            raise ModbusIOException("Failed to read battery nominal capacity (Reg 1005)")
-        bat_nominal_kwh = r_bat.registers[0] / 10.0
-        logger.info("Battery type reg=%d  nominal=%.1f kWh",
-                    r_bat_type.registers[0], bat_nominal_kwh)
-
-        # Base metadata block
+        # ShineWifi base block (FC03 0-124).
+        # Contains ShineWifi config.  Firmware string at regs 9-14 is correct
+        # (ShineWifi mirrors it).  module_id at regs 28-29 is zero on our
+        # hardware — the ShineWifi does not bridge those addresses.
+        firmware = "unknown"
+        module_id = 0
+        device_type = 0
         r_meta = client.read_holding_registers(0, count=125, device_id=slave_id)
-        if r_meta.isError():
-            raise ModbusIOException("Failed to read metadata holding block (Reg 0–124)")
-        regs_meta = r_meta.registers
+        if not r_meta.isError():
+            regs_meta = r_meta.registers
+            firmware = ascii_regs(regs_meta[9:15])
+            module_id = (regs_meta[28] << 16) | regs_meta[29]
+            device_type = regs_meta[121]
+        else:
+            logger.warning("read_device_info: FC03 0-124 failed — firmware/module_id unavailable")
 
-        # Serial number
+        # Model string derivation.
+        if module_id != 0:
+            try:
+                model, rated_w = _decode_model(r_meta.registers, device_type)
+            except ValueError as exc:
+                logger.warning("read_device_info: _decode_model failed: %s", exc)
+                model, rated_w = "Unknown Growatt Hybrid 3ph", 0
+        else:
+            logger.warning(
+                "read_device_info: module_id at FC03 regs 28-29 is zero "
+                "(ShineWifi does not bridge Protocol II holding registers at these "
+                "addresses). Model and rated power will be reported as unknown."
+            )
+            model, rated_w = "Unknown Growatt Hybrid 3ph", 0
+
+        # Serial number (FC03 3001-3015).
+        # Outside the ShineWifi's own 0-124 range; typically bridges to inverter.
+        serial = "unknown"
         r_serial = client.read_holding_registers(3001, count=15, device_id=slave_id)
-        if r_serial.isError():
-            raise ModbusIOException("Failed to read serial number (Reg 3001–3015)")
+        if not r_serial.isError():
+            serial = ascii_regs(r_serial.registers)
+        else:
+            logger.warning("read_device_info: FC03 3001-3015 (serial) failed")
 
-        firmware = ascii_regs(regs_meta[9:15])
-        serial = ascii_regs(r_serial.registers)
-        device_type = regs_meta[121]
+        # Battery type (FC03 1001).
+        battery_configured = False
+        r_bat_type = client.read_holding_registers(_REG_BATTERY_TYPE, count=1, device_id=slave_id)
+        if not r_bat_type.isError():
+            battery_configured = r_bat_type.registers[0] != 0
+            logger.info("Battery type reg=%d", r_bat_type.registers[0])
+        else:
+            logger.warning("read_device_info: FC03 1001 (battery type) failed")
 
-        model, rated_w = _decode_model(regs_meta, device_type)
-        logger.info("Discovered: %s (serial=%s, fw=%s, rated=%dW)", model, serial, firmware, rated_w)
+        # Battery nominal capacity (FC03 1005).
+        bat_nominal_kwh = 0.0
+        r_bat = client.read_holding_registers(1005, count=1, device_id=slave_id)
+        if not r_bat.isError():
+            bat_nominal_kwh = r_bat.registers[0] / 10.0
+            logger.info("Battery nominal=%.1f kWh", bat_nominal_kwh)
+        else:
+            logger.warning("read_device_info: FC03 1005 (battery nominal kWh) failed")
+
+        has_eps = (device_type == _DEVICE_TYPE_HU)
+        logger.info(
+            "Discovered: %s (serial=%s, fw=%s, rated=%dW, bat=%.1fkWh, eps=%s)",
+            model, serial, firmware, rated_w, bat_nominal_kwh, has_eps,
+        )
 
         return DeviceInfo(
             model=model,
@@ -259,10 +295,11 @@ class GrowattModHuDriver(GrowattBaseDriver):
             rated_power_w=rated_w,
             bat_nominal_kwh=bat_nominal_kwh,
             phases=_PHASES,
-            pv_strings=None,   # No Protocol II register reports MPPT string count.
-            has_eps=(device_type == _DEVICE_TYPE_HU),
+            pv_strings=None,
+            has_eps=has_eps,
             has_battery=battery_configured,
         )
+
 
     def read_registers(self, client, slave_id: int) -> GrowattReading:
         """
