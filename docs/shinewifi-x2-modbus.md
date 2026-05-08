@@ -202,10 +202,26 @@ The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3
 * **4**: Flash (Firmware updating)
 
 ### Fault Codes (Input Reg 3105)
+* **101**: Communication fault (Internal)
+* **116**: EEPROM fault
+* **119**: GFCI (Ground Fault) damage
+* **120**: HCT (Current Sensor) fault
+* **121**: Communication failure (Master/Slave)
+* **200**: AFCI (Arc Fault) detected
 * **201**: Leakage current too high
-* **202**: DC Isolation error
-* **300**: Grid AC voltage out of range
-* **302**: Grid frequency out of range
+* **202**: PV voltage high
+* **203**: PV insulation resistance low
+* **204**: PV terminals reversed
+* **300**: AC voltage out of range
+* **302**: AC frequency out of range
+* **303**: NE (Neutral-Earth) abnormal
+* **304**: AC frequency out of range
+* **403**: Unbalanced output current
+* **405**: Relay fault
+* **408**: NTC (Temperature) too high
+* **411**: BMS communication fault
+* **412**: Temperature sensor connection incorrect
+* **417**: EPS output voltage abnormal
 
 ---
 

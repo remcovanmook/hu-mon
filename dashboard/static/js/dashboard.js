@@ -83,10 +83,26 @@ const charts = {};
 const maxPoints = 60;
 const STATUS_MAP = {0: "WAITING", 1: "NORMAL", 3: "FAULT", 4: "FLASH"};
 const FAULT_MAP = {
+    101: "Communication fault (Internal)",
+    116: "EEPROM fault",
+    119: "GFCI (Ground Fault) damage",
+    120: "HCT (Current Sensor) fault",
+    121: "Communication failure (Master/Slave)",
+    200: "AFCI (Arc Fault) detected",
     201: "Leakage current too high",
-    202: "DC Isolation error",
-    300: "Grid AC voltage out of range",
-    302: "Grid frequency out of range"
+    202: "PV voltage high",
+    203: "PV insulation resistance low",
+    204: "PV terminals reversed",
+    300: "AC voltage out of range",
+    302: "AC frequency out of range",
+    303: "NE (Neutral-Earth) abnormal",
+    304: "AC frequency out of range",
+    403: "Unbalanced output current",
+    405: "Relay fault",
+    408: "NTC (Temperature) too high",
+    411: "BMS communication fault",
+    412: "Temperature sensor connection incorrect",
+    417: "EPS output voltage abnormal"
 };
 
 function chartPalette() {
@@ -530,9 +546,9 @@ function connectSSE() {
         let faultStr = "—";
         if (d.fault_code !== undefined) {
             if (d.fault_code === 0) {
-                faultStr = "0 -- None";
+                faultStr = "0 — None";
             } else {
-                faultStr = `${d.fault_code} -- ${FAULT_MAP[d.fault_code] || "Unknown Fault"}`;
+                faultStr = `${d.fault_code} — ${FAULT_MAP[d.fault_code] || "Unknown Fault"}`;
             }
         }
         updateDOM("meta-fault", faultStr);
