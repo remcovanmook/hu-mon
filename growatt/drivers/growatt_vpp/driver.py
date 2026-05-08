@@ -687,20 +687,18 @@ class GrowattVppDriver(GrowattBaseDriver):
         """
         Build the Modbus address map from the DTC register profile.
 
-        FC03 and FC04 ranges are derived from the active ``_RegProfile``
-        (set on ``_dtc_entry`` during ``read_device_info``, or falling back to
-        ``BASE_PROTO_II_VPP`` for unknown DTCs).  The full Protocol II block is
-        always included for Protocol II / VPP profiles so external clients can
-        access the complete device register space, not just our polling ranges.
+        The profile is derived from ``ctx.vpp_dtc`` (populated during Stage 3c
+        of the probe pipeline) so this method is correct when called immediately
+        after ``auto_select`` — before ``read_device_info`` has run.
 
-        An extra FC03 3125-3249 range is appended for MIN TL-XH US devices
-        when ``ctx.proto_ii_us_available`` is set.
+        Falls back to ``BASE_PROTO_II_VPP`` for unknown DTCs (VPP confirmed by
+        ``ctx.vpp_protocol_version``) or when DTC is absent.
 
         :param slave_id: Confirmed Modbus slave address.
-        :param ctx:      ProbeContext carrying protocol capability flags.
+        :param ctx:      ProbeContext carrying vpp_dtc and protocol flags.
         :returns:        ProxyConfig describing the servable register space.
         """
-        entry = self._dtc_entry
+        entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc) if ctx.vpp_dtc else None
         profile = entry.reg_profile if entry else _RegProfile.BASE_PROTO_II_VPP
         fc03 = list(_FC03_RANGES[profile])
         fc04 = list(_FC04_RANGES[profile])
