@@ -19,7 +19,7 @@ from growatt.drivers.growatt_base import (
     _u32,
     GROWATT_SERIES,
 )
-from growatt.drivers.codec import u32_be
+from modbus.codec import u32_be
 
 
 # ---------------------------------------------------------------------------

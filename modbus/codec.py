@@ -1,6 +1,6 @@
 """
-growatt.drivers.codec
-~~~~~~~~~~~~~~~~~~~~~
+modbus.codec
+~~~~~~~~~~~~
 Vendor-neutral Modbus register type library.
 
 Provides conversion functions for every standard Modbus data type in both

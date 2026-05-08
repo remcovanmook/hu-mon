@@ -1,7 +1,7 @@
 """
 tests.test_codec
 ~~~~~~~~~~~~~~~~
-Unit tests for growatt.drivers.codec.
+Unit tests for modbus.codec.
 
 Covers every public function: boundary values, sign boundaries, byte-swap
 correctness, IEEE 754 round-trips, and ASCII decoding edge cases.
@@ -11,7 +11,7 @@ import math
 import struct
 import unittest
 
-from growatt.drivers.codec import (
+from modbus.codec import (
     ascii_regs,
     float32_be,
     float32_le,

@@ -6,7 +6,7 @@ growatt.drivers.growatt_base now that the parse_* functions have been
 removed from growatt_collector.
 
 Tests verify the Growatt-specific 0xFFFF sentinel behaviour (returns 0)
-which is intentionally separate from the generic growatt.drivers.codec.
+which is intentionally separate from the generic modbus.codec.
 """
 
 import unittest

@@ -35,7 +35,7 @@ import time
 from pymodbus.exceptions import ModbusIOException
 
 from growatt.drivers.base import BaseDriver, DeviceInfo, ProbeContext
-from growatt.drivers.codec import ascii_regs
+from modbus.codec import ascii_regs
 from growatt.drivers.growatt_base import (
     GROWATT_SERIES,
     GrowattBaseDriver,

@@ -9,7 +9,7 @@ Implements the vendor-level portion of the two-tier probe:
      which subclasses implement to narrow down the model family.
 
 Also provides Growatt-specific sentinel-aware register wrappers that call into
-growatt.drivers.codec.  The 0xFFFF sentinel is a Growatt firmware convention
+modbus.codec.  The 0xFFFF sentinel is a Growatt firmware convention
 (registers hold 0xFFFF during night / sleep mode) and does not belong in the
 generic codec.
 
@@ -20,7 +20,7 @@ import re
 from abc import abstractmethod
 
 from growatt.drivers.base import BaseDriver, ProbeContext
-from growatt.drivers.codec import ascii_regs, s32_be, u16_be, u32_be
+from modbus.codec import ascii_regs, s32_be, u16_be, u32_be
 
 # ---------------------------------------------------------------------------
 # Growatt series code → series name mapping.
