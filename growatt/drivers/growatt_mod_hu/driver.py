@@ -150,24 +150,25 @@ class GrowattModHuDriver(GrowattBaseDriver):
     def driver_id(self) -> str:
         return "growatt_mod_hu"
 
-    @property
-    def proxy_config(self) -> ProxyConfig:
+    def proxy_config(self, slave_id: int) -> ProxyConfig:
         """
         Return the Modbus address space the proxy server should expose.
 
-        Structured as {slave_id: {function_code: [(start, count)]}}.  The
-        slave_id is the Growatt default (1).  FC 04 (input) ranges are derived
-        directly from SEGMENTS so the proxy and collector always cover the same
-        address space.  FC 03 (holding) ranges cover the one-time metadata
+        Structured as {slave_id: {function_code: [(start, count)]}}.  FC 04
+        ranges are derived from SEGMENTS so the proxy and collector always cover
+        the same address space.  FC 03 ranges cover the one-time metadata
         registers read by read_device_info(), allowing third-party systems to
         query device identity through the proxy.
+
+        :param slave_id: Confirmed Modbus slave address from the probe pipeline.
+        :returns:        ProxyConfig describing the servable register space.
         """
         # Build FC 04 map from SEGMENTS.
         fc4_ranges = [(start, count) for label, start, count in SEGMENTS
                       if _FC_LABEL[label] == 4]
         return ProxyConfig(
             address_map={
-                1: {
+                slave_id: {
                     3: _PROXY_HOLDING_RANGES,
                     4: fc4_ranges,
                 }

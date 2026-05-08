@@ -169,16 +169,19 @@ class BaseDriver(ABC):
         :param slave_id: Confirmed Modbus slave address from ProbeContext.
         """
 
-    @property
     @abstractmethod
-    def proxy_config(self) -> ProxyConfig:
+    def proxy_config(self, slave_id: int) -> ProxyConfig:
         """
         Return the Modbus address space this driver expects the proxy to serve.
 
-        Called once after probe() succeeds.  The proxy server uses this to
-        build its register data block (slave ID, supported FCs, address ranges)
-        instead of hardcoding device-specific values.
+        Called once after probe() succeeds, using the confirmed slave_id.
+        The proxy server uses this to build its register data block (slave ID,
+        supported FCs, address ranges) instead of hardcoding device-specific
+        values.
 
         Implementations should derive ranges directly from their SEGMENTS
         constant so the proxy and the collector stay in sync automatically.
+
+        :param slave_id: Confirmed Modbus slave address from the probe pipeline.
+        :returns:        ProxyConfig describing the servable register space.
         """

@@ -401,7 +401,7 @@ class TestReadRegistersShifted(unittest.TestCase):
 class TestProxyConfig(unittest.TestCase):
 
     def setUp(self):
-        self.cfg = GrowattModHuDriver().proxy_config
+        self.cfg = GrowattModHuDriver().proxy_config(slave_id=1)
 
     def test_address_map_has_slave_1(self):
         self.assertIn(1, self.cfg.address_map)

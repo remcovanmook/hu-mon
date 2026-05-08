@@ -54,7 +54,7 @@ def main():
     probe_client = ModbusTcpClient(args.device_ip, port=args.datalogger_port)
     probe_client.connect()
     driver, slave_id = auto_select(probe_client, force_driver_id=args.driver)
-    proxy_cfg = driver.proxy_config
+    proxy_cfg = driver.proxy_config(slave_id)
     probe_client.close()
     logger.info("Driver: %s  Proxy address_map: %s", driver.driver_id, proxy_cfg.address_map)
 
