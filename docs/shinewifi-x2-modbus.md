@@ -28,7 +28,36 @@ This document provides the full technical specification for interacting with the
 
 ---
 
-## 3. Consolidated Register Map (Function Code 04)
+## 3. Firmware Memory Layout Patterns
+Growatt's three-phase firmware relies on three strictly consistent data structures to pack memory:
+
+### A. The "4-Register Power Block" (Used for PV and Grid)
+For direct energy sources, exactly 4 registers are allocated per channel in the sequence: `Voltage (U16)`, `Current (U16)`, `Power High (U16)`, `Power Low (U16)`.
+* **PV Strings (`3003` to `3018`)**:
+  * `3003-3006`: PV1 V, PV1 A, PV1 Power (U32)
+  * `3007-3010`: PV2 V, PV2 A, PV2 Power (U32)
+* **Grid Channels (`3026` to `3037`)**:
+  * `3026-3029`: L1 V, L1 A, L1 Power (U32)
+  * `3030-3033`: L2 V, L2 A, L2 Power (U32)
+
+### B. The "Split Phase Block" (Used for EPS and Smart Meter)
+For internal load calculations, the firmware does not interleave Voltage/Current with Power. It lists all V/A pairs sequentially, followed by a contiguous block of U32 Powers.
+* **EPS Block (`3130` to `3141`)**:
+  * `3130-3135`: L1 V/A, L2 V/A, L3 V/A (6 contiguous registers)
+  * `3136-3141`: L1 Power, L2 Power, L3 Power (6 contiguous registers, U32 format)
+* **Smart Meter Block (`3121` to `3128`)**:
+  * The smart meter doesn't report voltage to the inverter, so it just lists the powers directly: Total Net, L1 Net, L2 Net, L3 Net.
+
+### C. The "Today/Total Counters" (Used for Energy)
+Every lifetime energy metric is allocated exactly 4 contiguous registers: `Today (U32)` followed immediately by `Total (U32)`.
+* `3049-3052`: PV Today / PV Total
+* `3176-3179`: Bat Discharge Today / Discharge Total
+* `3184-3187`: Grid Import Today / Import Total
+* `3188-3191`: Load Today / Load Total
+
+---
+
+## 4. Consolidated Register Map (Function Code 04)
 These registers are Read-Only and provide real-time telemetry.
 
 | Function Code | Address | Name | Type | Unit | Scale | Description |
