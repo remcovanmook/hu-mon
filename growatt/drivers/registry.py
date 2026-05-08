@@ -204,7 +204,7 @@ def auto_select(
         holding_block, max_block_size = _read_holding_block(client, slave_id)
         if holding_block:
             non_zero = {i: v for i, v in enumerate(holding_block) if v != 0}
-            logger.info(
+            logger.debug(
                 "FC03 0-124 non-zero: %s",
                 {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero.items())},
             )
@@ -219,8 +219,8 @@ def auto_select(
                 input_block = r.registers
                 logger.info("Input block 3000-3029: %d registers read", len(input_block))
                 non_zero_in = {3000 + i: v for i, v in enumerate(input_block) if v != 0}
-                logger.info("Input block non-zero: %s",
-                            {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero_in.items())})
+                logger.debug("Input block non-zero: %s",
+                             {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero_in.items())})
             else:
                 logger.warning("Input block 3000-3029 read error: %s", r)
         except Exception as exc:
@@ -245,7 +245,7 @@ def auto_select(
                 else:
                     logger.debug("VPP 30099=%d — not a plausible VPP version", ver)
                 non_zero_vpp = {30000 + i: v for i, v in enumerate(r.registers) if v != 0}
-                logger.info(
+                logger.debug(
                     "VPP block 30000-30099 non-zero: %s",
                     {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero_vpp.items())},
                 )
