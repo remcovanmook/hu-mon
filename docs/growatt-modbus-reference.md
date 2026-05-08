@@ -21,7 +21,83 @@ The ShineWifi-X2 is a thin TCP→RS485 bridge. It does **not** have its own regi
 
 ---
 
-## 2. Protocol Families
+## 2. Device Detection (Probe Pipeline)
+
+Runs once at startup. Identifies the device family and configures the proxy register ranges. Implemented in `growatt/drivers/registry.py`.
+
+### Stage 1 — Slave ID
+
+Read FC03 register 0 (one register) for each candidate slave ID: **1, 2, 3, 247**. First to respond without error wins.
+
+```
+→ FC03 addr=0 count=1 slave=1  → ok  (slave_id = 1)
+```
+
+### Stage 2 — Function Code Support
+
+Test FC03 and FC04 individually against the confirmed slave ID. Records which are available; drivers that require an absent FC are skipped.
+
+```
+→ FC03 addr=0 count=1   → ok  (FC03 supported)
+→ FC04 addr=3000 count=1 → ok  (FC04 supported)
+```
+
+### Stage 3 — Holding Block Chunk Size
+
+Try to read the largest contiguous FC03 block starting at 0, using chunk sizes in order: **125, 64, 32, 16**. The first that succeeds sets the per-request limit used for the rest of the session.
+
+```
+→ FC03 addr=0 count=125  → ok  (chunk size = 125 registers)
+```
+
+Result is stored in the probe context as `holding_block` (125 registers, FC03 0–124).
+
+### Stage 3b — Protocol II Identity (FC04 3000–3029)
+
+Read 30 FC04 input registers starting at 3000. Used to confirm the device is a Growatt: `reg[0]` (status) must be in the valid range 0–10.
+
+```
+→ FC04 addr=3000 count=30  → status=0x0000  (Growatt confirmed)
+```
+
+### Stage 3c — VPP DTC and Protocol Version (FC03 30000–30099)
+
+Read 100 FC03 registers starting at 30000 (the VPP Basic Parameter block).
+
+- **reg[0]** = DTC code (e.g. 5401)
+- **reg[99]** = VPP protocol version (e.g. 202 = V2.02)
+
+A version in the range 200–299 confirms VPP capability. The DTC is looked up in the DTC table (Section 6) to determine family, phase count, EPS presence, and register profile.
+
+```
+→ FC03 addr=30000 count=100  → DTC=5401 (MOD/MID-HU, 3-phase, EPS)
+                               VPP version=202 (V2.02)
+```
+
+### Stage 4 — Driver Selection
+
+Iterates the driver registry in priority order. The first driver whose `probe()` returns True is used. Priority:
+
+1. `GrowattVppDriver` — matches if VPP version is present and DTC is known
+2. `GrowattModHuDriver` — fallback for older firmware without VPP registers
+
+### Stage 5 — Device Info and Static Register Seeding
+
+After driver selection, `read_device_info()` is called once:
+
+1. **FC03 30000–30099** — full VPP parameter block (DTC, model, serial, rated power, VPP version)
+2. **FC03 30001–30015** — serial number string (ASCII)
+3. **FC03 9–14** — DSP firmware string
+4. **FC03 44** — TP register (PV string count / phase count); overrides DTC-inferred phases
+5. **FC03 0–124** — full base holding block; seeded into static register cache
+6. **FC03 1001** — battery type (SPH/SPA/HU only)
+7. **FC03 1005** — battery nominal capacity (SPH/SPA/HU only)
+
+The static cache is served by the proxy for all subsequent FC03 reads in those ranges. No re-read on reconnect.
+
+---
+
+## 3. Protocol Families
 
 Growatt devices expose one or more register spaces depending on the product family.
 
