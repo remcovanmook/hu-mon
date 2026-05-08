@@ -128,11 +128,10 @@ class TestDecodeModel(unittest.TestCase):
         model, rated = _decode_model(self._block(0x0B, 10000, 4), 4)
         self.assertEqual(model, "MOD 10KKTL3-XH")
 
-    def test_fallback_on_zero_module_id(self):
+    def test_zero_module_id_raises(self):
         block = [0] * 125
-        model, rated = _decode_model(block, 6)
-        self.assertEqual(model, "MOD 12KTL3-HU")
-        self.assertEqual(rated, 12000)
+        with self.assertRaises(ValueError):
+            _decode_model(block, 6)
 
     def test_rated_power_scaling(self):
         # power_watts >= 1000: rated_power_w = power_watts (no ×10)

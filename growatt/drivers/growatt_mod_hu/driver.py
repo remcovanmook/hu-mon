@@ -103,8 +103,9 @@ def _decode_model(regs_meta: list, device_type: int) -> tuple:
     """
     module_id = (regs_meta[28] << 16) | regs_meta[29]
     if module_id == 0:
-        # Proxy may zero out this field; fall back to a known default.
-        return "MOD 12KTL3-HU", 12000
+        raise ValueError(
+            "module_id at Holding Regs 28–29 is zero: register read failed or block is invalid"
+        )
 
     series_code = (module_id >> 16) & 0xFFFF
     power_watts = module_id & 0xFFFF
