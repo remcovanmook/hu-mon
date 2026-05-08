@@ -94,7 +94,7 @@ const FAULT_MAP = {
     203: "PV insulation resistance low",
     204: "PV terminals reversed",
     300: "AC voltage out of range",
-    302: "AC frequency out of range",
+    302: "No AC connection",
     303: "NE (Neutral-Earth) abnormal",
     304: "AC frequency out of range",
     403: "Unbalanced output current",

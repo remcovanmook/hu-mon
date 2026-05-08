@@ -83,10 +83,10 @@ These registers are Read-Only and provide real-time telemetry.
 | 03 (Hold) | 3001-15 | New Serial | ASCII | — | — | 30-char Inverter Serial Number |
 | **SYSTEM STATE** | | | | | | |
 | 04 (Input) | 3000 | Inverter Status | U16 | — | 1 | 0:Wait, 1:Normal, 3:Fault |
-| 04 (Input) | 3105 | Fault Code | U16 | — | 1 | Main Error code (0 = None) |
-| 04 (Input) | 3106 | Warning Code | U16 | — | 1 | Warning bitmask |
 | 04 (Input) | 3094 | Inverter Temp | U16 | °C | 0.1 | Heat sink temperature (HU-Hybrid -20 Shift Profile) |
 | 04 (Input) | 3095 | Boost Temp | U16 | °C | 0.1 | Internal converter temperature (HU-Hybrid -20 Shift Profile) |
+| 04 (Input) | 3105 | Fault Code | U16 | — | 1 | Main Error code (0 = None) |
+| 04 (Input) | 3106 | Warning Code | U16 | — | 1 | Warning bitmask |
 | **PV INPUTS** | | | | | | |
 | 04 (Input) | 3001-02 | Total PV Power | U32 | W | 0.1 | Combined solar input |
 | 04 (Input) | 3003-04 | PV1 V / I | U16×2 | V/A | 0.1 | String 1 Voltage & Amps |
@@ -144,7 +144,7 @@ These registers are Read-Only and provide real-time telemetry.
 | 04 (Input) | 5403 / 5503 | Max Cell Temp | U16 | °C | 0.1 | Hottest cell in module |
 | 04 (Input) | 5404 / 5504 | Min Cell Temp | U16 | °C | 0.1 | Coldest cell in module |
 | 04 (Input) | 5407 / 5507 | Module SOH | U16 | % | 1 | State of Health per brick |
-| **ENERGY TOTALS** | | | | | | || **ENERGY TOTALS** | | | | | | |
+| **ENERGY TOTALS** | | | | | | |
 | 04 (Input) | 3049-50 | Epv Today | U32 | kWh | 0.1 | Solar generated today |
 | 04 (Input) | 3053-54 | Eac Today | U32 | kWh | 0.1 | System AC energy today |
 | 04 (Input) | 3051-52 | Epv Total | U32 | kWh | 0.1 | Solar lifetime |
@@ -213,7 +213,7 @@ The base registers only provide `MOD` and `12000`. The rest of the string (`KTL3
 * **203**: PV insulation resistance low
 * **204**: PV terminals reversed
 * **300**: AC voltage out of range
-* **302**: AC frequency out of range
+* **302**: No AC connection
 * **303**: NE (Neutral-Earth) abnormal
 * **304**: AC frequency out of range
 * **403**: Unbalanced output current
