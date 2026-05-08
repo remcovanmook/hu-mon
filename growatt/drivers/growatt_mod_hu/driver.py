@@ -62,11 +62,23 @@ _DEVICE_TYPE_XH = 4   # Battery-Ready (No EPS)
 # Each tuple: (function_code_label, start_address, count)
 # ---------------------------------------------------------------------------
 SEGMENTS = [
-    ("input", 3000,  30),   # Segment 1: PV / Status
-    ("input", 3030,  80),   # Segment 2: Grid / Counters / Temp
-    ("input", 3110,  45),   # Segment 3: Meter / EPS / Temp
-    ("input", 3170,  20),   # Segment 4: Battery BMS
-    ("input",    0, 125),   # Segment 5: Low-block mirror (proxy)
+    ("input",   3000,  30),   # Segment 1: PV / Status
+    ("input",   3030,  80),   # Segment 2: Grid / Counters / Temp
+    ("input",   3110,  45),   # Segment 3: Meter / EPS / Temp
+    ("input",   3170,  20),   # Segment 4: Battery BMS
+    ("input",      0, 125),   # Segment 5: Low-block mirror (proxy)
+]
+
+# Mapping from SEGMENTS label strings to Modbus function code integers.
+_FC_LABEL = {"holding": 3, "input": 4}
+
+# Holding register ranges exposed by the proxy so third-party systems can
+# read device metadata via FC 03.  These mirror the one-time reads made in
+# read_device_info().
+_PROXY_HOLDING_RANGES = [
+    (0,    125),   # Low metadata block (firmware, module_id, device type, etc.)
+    (1005,   1),   # Battery nominal capacity
+    (3001,  15),   # Serial number
 ]
 
 # Inter-segment pause to prevent ShineWifi-X2 overload.
@@ -134,23 +146,25 @@ class GrowattModHuDriver(GrowattBaseDriver):
     @property
     def proxy_config(self) -> ProxyConfig:
         """
-        Return the Modbus address space the proxy server should expose for
-        this driver.
+        Return the Modbus address space the proxy server should expose.
 
-        slave_id is 1 (the standard Growatt default; the actual confirmed
-        slave_id from the probe is passed separately at runtime, but the
-        proxy advertises the same ID).
-
-        function_codes covers FC 03 (holding, for metadata reads) and
-        FC 04 (input, for all telemetry segments).
-
-        ranges is derived directly from SEGMENTS so the proxy address space
-        always matches what the collector actually polls.
+        Structured as {slave_id: {function_code: [(start, count)]}}.  The
+        slave_id is the Growatt default (1).  FC 04 (input) ranges are derived
+        directly from SEGMENTS so the proxy and collector always cover the same
+        address space.  FC 03 (holding) ranges cover the one-time metadata
+        registers read by read_device_info(), allowing third-party systems to
+        query device identity through the proxy.
         """
+        # Build FC 04 map from SEGMENTS.
+        fc4_ranges = [(start, count) for label, start, count in SEGMENTS
+                      if _FC_LABEL[label] == 4]
         return ProxyConfig(
-            slave_id=1,
-            function_codes={3, 4},
-            ranges=[(start, count) for _, start, count in SEGMENTS],
+            address_map={
+                1: {
+                    3: _PROXY_HOLDING_RANGES,
+                    4: fc4_ranges,
+                }
+            }
         )
 
     def _probe_series(self, ctx: ProbeContext) -> bool:

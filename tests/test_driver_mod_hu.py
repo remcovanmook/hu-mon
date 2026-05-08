@@ -296,24 +296,35 @@ class TestReadRegistersShifted(unittest.TestCase):
 
 class TestProxyConfig(unittest.TestCase):
 
-    def test_slave_id(self):
-        cfg = GrowattModHuDriver().proxy_config
-        self.assertEqual(cfg.slave_id, 1)
+    def setUp(self):
+        self.cfg = GrowattModHuDriver().proxy_config
 
-    def test_function_codes(self):
-        cfg = GrowattModHuDriver().proxy_config
-        self.assertIn(3, cfg.function_codes)
-        self.assertIn(4, cfg.function_codes)
+    def test_address_map_has_slave_1(self):
+        self.assertIn(1, self.cfg.address_map)
 
-    def test_ranges_match_segments(self):
-        from growatt.drivers.growatt_mod_hu.driver import SEGMENTS
-        cfg = GrowattModHuDriver().proxy_config
-        expected = [(start, count) for _, start, count in SEGMENTS]
-        self.assertEqual(cfg.ranges, expected)
+    def test_slave_1_has_fc3_and_fc4(self):
+        fc_map = self.cfg.address_map[1]
+        self.assertIn(3, fc_map)
+        self.assertIn(4, fc_map)
 
-    def test_ranges_non_empty(self):
-        cfg = GrowattModHuDriver().proxy_config
-        self.assertGreater(len(cfg.ranges), 0)
+    def test_fc4_ranges_match_segments(self):
+        from growatt.drivers.growatt_mod_hu.driver import SEGMENTS, _FC_LABEL
+        expected = [(s, c) for label, s, c in SEGMENTS if _FC_LABEL[label] == 4]
+        self.assertEqual(self.cfg.address_map[1][4], expected)
+
+    def test_fc3_ranges_non_empty(self):
+        self.assertGreater(len(self.cfg.address_map[1][3]), 0)
+
+    def test_fc4_ranges_non_empty(self):
+        self.assertGreater(len(self.cfg.address_map[1][4]), 0)
+
+    def test_fc3_covers_low_metadata_block(self):
+        # (0, 125) must appear in the FC 03 range list.
+        self.assertIn((0, 125), self.cfg.address_map[1][3])
+
+    def test_fc4_covers_primary_telemetry(self):
+        # Segment 1 (PV) must appear.
+        self.assertIn((3000, 30), self.cfg.address_map[1][4])
 
 
 if __name__ == '__main__':

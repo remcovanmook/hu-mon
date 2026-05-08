@@ -16,7 +16,7 @@ the context.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Forward-declared as a string to avoid a circular import; the actual class
 # lives in growatt.reading.
@@ -73,20 +73,28 @@ class ProxyConfig:
     """
     Describes the Modbus address space the proxy server should expose.
 
-    Derived from the selected driver and passed to the proxy server at
-    startup.  The proxy uses this to build its register data block and
-    determine which reads to serve.
+    Structured as a nested mapping so the proxy knows exactly which register
+    ranges belong to which function code on which slave:
 
-    Attributes:
-        slave_id:        Modbus slave ID the proxy advertises.
-        function_codes:  Set of FC numbers the proxy handles (e.g. {3, 4}).
-        ranges:          List of (start_address, count) tuples defining every
-                         contiguous register block the proxy must be able to
-                         answer.  Derived directly from the driver's SEGMENTS.
+        address_map = {
+            slave_id: {
+                function_code: [(start_address, count), ...],
+                ...
+            },
+            ...
+        }
+
+    Example for a Growatt MOD-HU on slave 1:
+        {
+            1: {
+                4: [(3000, 30), (3030, 80), (3110, 45), (3170, 20), (0, 125)],
+            }
+        }
+
+    Derived from the selected driver's SEGMENTS constant so the proxy address
+    space always matches what the collector actually polls.
     """
-    slave_id: int
-    function_codes: set
-    ranges: List[Tuple[int, int]]  # (start_address, count)
+    address_map: Dict[int, Dict[int, List[Tuple[int, int]]]]
 
 
 class BaseDriver(ABC):

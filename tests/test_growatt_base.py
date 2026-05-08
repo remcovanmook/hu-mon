@@ -47,7 +47,7 @@ class _StubDriver(GrowattBaseDriver):
 
     @property
     def proxy_config(self):
-        return ProxyConfig(slave_id=1, function_codes={3, 4}, ranges=[])
+        return ProxyConfig(address_map={1: {3: [], 4: []}})
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ class TestProbe(unittest.TestCase):
             def read_device_info(self, c, s): raise NotImplementedError
             def read_registers(self, c, s): raise NotImplementedError
             @property
-            def proxy_config(self): return ProxyConfig(slave_id=1, function_codes={3, 4}, ranges=[])
+            def proxy_config(self): return ProxyConfig(address_map={1: {3: [], 4: []}})
 
         block = _make_block(series_code=0x0B)
         ctx = _make_ctx(block)
