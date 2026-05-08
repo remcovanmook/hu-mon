@@ -387,13 +387,14 @@ class TestReadRegistersVPP(unittest.TestCase):
         r = driver.read_registers(client, slave_id=1)
         self.assertAlmostEqual(r.inverter_temp, 55.3)
 
-    def test_meter_total_w_sign_inversion(self):
-        """VPP meter_power pos=import; GrowattReading meter_total_w pos=export."""
+    def test_meter_total_w_uses_ac_active_output(self):
+        """meter_total_w is the inverter AC output (31100-31101), not the smart meter register.
+        No smart meter is installed; 31112-31113 would read 0."""
         driver = GrowattVppDriver()
-        # meter_h=0, meter_l=1000 → raw = +1000 (import) → stored as -100.0W
-        client = self._make_client(s2=_make_s2(meter_h=0, meter_l=1000))
+        # ac_active_l=31894 → ac_active_w = 3189.4 W (positive = export)
+        client = self._make_client(s2=_make_s2(ac_active_h=0, ac_active_l=31894))
         r = driver.read_registers(client, slave_id=1)
-        self.assertAlmostEqual(r.meter_total_w, -100.0)
+        self.assertAlmostEqual(r.meter_total_w, 3189.4, places=1)
 
     def test_battery_skipped_when_all_zero(self):
         driver = GrowattVppDriver()
