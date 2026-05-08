@@ -189,9 +189,11 @@ Key registers; full table in VPP spec Section 2.
 |---|---|---|---|---|
 | 31000 | Working state | U16 | 1 | See state table below |
 | 31001 | Battery working state | U16 | 1 | 0=standby, 1=disconnected, 2=charging, 3=discharging |
-| 31002 | Error code | U16 | 1 | |
-| 31003 | Warning code | U16 | 1 | |
-| 31008 | Active power output control | U16 | 1 | Current active power setpoint |
+| 31002 | Priority of work | U16 | 1 | 0=load first, 1=battery first, 2=grid first |
+| 31005 | Fault code | U16 | 1 | See fault table |
+| 31006 | Fault sub-code | U16 | 1 | |
+| 31007 | Alarm code | U16 | 1 | |
+| 31008 | Alarm sub-code | U16 | 1 | |
 
 **Working state values (31000):**
 
@@ -240,7 +242,7 @@ The TP register (FC03 30031 high byte) gives the actual string count for the dev
 | 31109 | Phase A current | U16 | 0.1 | A | |
 | 31110 | Phase B current | U16 | 0.1 | A | |
 | 31111 | Phase C current | U16 | 0.1 | A | |
-| 31112–13 | Meter power | S32 | 0.1 | W | + = import from grid |
+| 31112–13 | Meter power | S32 | 0.1 | W | + = import from grid, − = export to grid |
 | 31114 | Inverter temperature | U16 | 0.1 | °C | |
 | 31115 | Boost temperature | U16 | 0.1 | °C | |
 
@@ -259,20 +261,29 @@ The TP register (FC03 30031 high byte) gives the actual string count for the dev
 
 #### Battery Information (31200–31299, cluster 0)
 
-Applies to MOD/MID-HU and SPH/SPA devices. Each additional battery cluster maps to 31300–31399, 31400–31499, 31500–31599.
+Applies to MOD/MID-HU and SPH/SPA devices with connected battery. Each additional cluster maps the same layout to 31300–31399, 31400–31499, 31500–31599.
 
-| Address | Name | Type | Scale | Unit |
-|---|---|---|---|---|
-| 31200–01 | Battery charge power | U32 | 0.1 | W |
-| 31202–03 | Battery discharge power | U32 | 0.1 | W |
-| 31204–05 | Max allowable charge power | U32 | 0.1 | W |
-| 31206–07 | Max allowable discharge power | U32 | 0.1 | W |
-| 31208 | Battery voltage | U16 | 0.1 | V |
-| 31209 | Battery current | S16 | 0.1 | A | + charge |
-| 31210 | SOC | U16 | 1 | % |
-| 31211 | SOH | U16 | 1 | % |
-| 31212 | Battery capacity | U16 | 0.1 | kWh |
-| 31214 | Battery temperature | S16 | 0.1 | °C |
+Select the active cluster with FC03 30300 (battery cluster index, default 0).
+
+| Address | Name | Type | Scale | Unit | Notes |
+|---|---|---|---|---|---|
+| 31200–01 | Charge/discharge power | S32 | 0.1 | W | + = charging, − = discharging |
+| 31202–03 | Daily charge energy | U32 | 0.1 | kWh | |
+| 31204–05 | Cumulative charge energy | U32 | 0.1 | kWh | |
+| 31206–07 | Daily discharge energy | U32 | 0.1 | kWh | |
+| 31208–09 | Cumulative discharge energy | U32 | 0.1 | kWh | |
+| 31210–11 | Max allowable charge power | U32 | 0.1 | W | From BMS |
+| 31212–13 | Max allowable discharge power | U32 | 0.1 | W | From BMS |
+| 31214 | Battery voltage | S16 | 0.1 | V | |
+| 31215–16 | Battery current | S32 | 0.1 | A | + = charging |
+| 31217 | SOC | U8 | 1 | % | [0, 100] |
+| 31218 | SOH | U8 | 1 | % | [0, 100] |
+| 31219–20 | Battery capacity (FCC) | U32 | 1 | Ah | Full charge capacity |
+| 31223 | Battery temperature | S16 | 0.1 | °C | Environmental |
+| 31225 | Cluster count | U16 | 1 | — | Total battery clusters |
+| 31226 | Modules per cluster | U16 | 1 | — | |
+| 31227 | Module rated voltage | U16 | 0.1 | V | |
+| 31228 | Module rated capacity | U16 | 0.1 | Ah | |
 
 ---
 
@@ -349,16 +360,56 @@ The proxy serves different FC03/FC04 ranges per profile.
 
 ---
 
-## 8. FC03 Holding Register Identity Block (0–124)
+## 8. FC03 Holding Registers: Protocol II Base Block (0–124)
 
-These are the inverter's own Protocol II holding registers, correctly bridged by the ShineWifi-X2 (contrary to earlier speculation). Notable fields:
+Source: Growatt Inverter Modbus RTU Protocol II V1.39. All registers accessible via FC03. Bridged by ShineWifi-X2.
 
-| Address | Name | Type | Notes |
-|---|---|---|---|
-| 9–14 | DSP firmware version | ASCII×6 | e.g. `DO1.0ZBDC` |
-| 28–29 | Module ID | U32 | High word = series code, low word = rated watts. May read 0 via ShineWifi. |
-| 44 | TP register | U16 | High byte = PV string inputs, low byte = phase count |
-| 121 | Device type | U16 | May reflect ShineWifi config (0x78 observed), not inverter type |
+### Control (0–33)
+
+| Address | Name | R/W | Type | Scale | Notes |
+|---|---|---|---|---|---|
+| 0 | On/Off | RW | U16 | — | 1=on, 0=off (inverter); 3=on, 2=off (BDC) |
+| 1 | Safety function enable | RW | U16 | — | Bitmask: bit0=SPI, bit2=LVFRT, bit3=FreqDerate, bit10=SplitPhase |
+| 3 | Active power rate | RW | U16 | % | [0,100]; 255 = unlimited |
+| 4 | Reactive power rate | RW | U16 | % | [−100,100]; 255 = unlimited |
+| 5 | Power factor | RW | U16 | ×0.0001 | [0,20000]; 0–10000=underexcited, 10001–20000=overexcited |
+| 6–7 | Pmax H/L | R | U32 | 0.1 VA | Rated apparent power |
+| 8 | Vnormal | R | U16 | 0.1 V | Nominal PV operating voltage |
+| 9–11 | Firmware version H/M/L | R | ASCII×3 | — | DSP firmware string (e.g. `DO1.0ZBDC`) |
+| 12–14 | Firmware version 2 H/M/L | R | ASCII×3 | — | Control board firmware |
+| 15 | LCD language | RW | U16 | — | 0=Italian, 1=English, 2=German, 3=Spanish, 4=French, 5=Chinese |
+| 16 | Country selected | RW | U16 | — | 0=not set, 1=set |
+| 17 | Vpv start | RW | U16 | 0.1 V | PV startup voltage threshold |
+| 18 | Time start | RW | U16 | 1 s | Startup delay after PV available |
+| 22 | Baud rate | RW | U16 | — | 0=9600, 1=38400 |
+| 23–27 | Serial number | R | ASCII×5 | — | 10 chars (older models; newer use FC03 3001–3015) |
+| 28 | Module H | R | U16 | — | Series code (high word of module ID) |
+| 29 | Module L | R | U16 | — | Rated watts (low word of module ID) |
+| 30 | COM address | RW | U16 | — | RS485 slave address [1,254]; default 1 |
+| 44 | TP register | R | U16 | — | High byte = PV string input count; low byte = AC phase count |
+
+### Second Group Identity (125–127)
+
+| Address | Name | R/W | Type | Notes |
+|---|---|---|---|---|
+| 125–127 | Inverter type | R | ASCII×3 | 6-char model type code |
+
+### TL-X / TL-XH Extended Holding Block (FC03 3000–3083)
+
+Present on MOD, MID, MIN-X, MIC-X, and similar TL-X/XH variants.
+
+| Address | Name | R/W | Type | Scale | Notes |
+|---|---|---|---|---|---|
+| 3001–15 | Serial number (new) | R | ASCII×15 | — | 30-char serial; supersedes FC03 23–27 |
+| 3018 | Work mode | RW | U16 | — | 0=load first, 1=PV first, 2=bat first, 3=grid first |
+| 3023 | Grid type | RW | U16 | — | 0=single phase, 1=three phase |
+| 3025 | Battery low warning voltage | RW | U16 | 0.1 V | |
+| 3027 | Battery cut-off voltage | RW | U16 | 0.1 V | |
+| 3036 | Grid-first discharge power rate | RW | U16 | 0.1 % | |
+| 3037 | Grid-first stop SOC | RW | U16 | 1 % | |
+| 3047 | Battery-first charge power rate | RW | U16 | 0.1 % | |
+| 3048 | Battery-first stop SOC | RW | U16 | 1 % | |
+| 3049 | AC charge enable | RW | U16 | — | 0=off, 1=on |
 
 ---
 
