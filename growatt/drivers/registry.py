@@ -201,6 +201,12 @@ def auto_select(
     holding_block, max_block_size = None, 0
     if 3 in supported_fcs:
         holding_block, max_block_size = _read_holding_block(client, slave_id)
+        if holding_block:
+            non_zero = {i: v for i, v in enumerate(holding_block) if v != 0}
+            logger.info(
+                "FC03 0-124 non-zero: %s",
+                {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero.items())},
+            )
 
     # Stage 3b: Inverter FC04 input block (Protocol II, 3000-3029).
     # 30 registers are enough for status + PV identification.
@@ -258,12 +264,7 @@ def auto_select(
         vpp_protocol_version=vpp_protocol_version,
     )
 
-    if holding_block:
-        non_zero = {i: v for i, v in enumerate(holding_block) if v != 0}
-        logger.info(
-            "Holding block non-zero registers (reg: value): %s",
-            {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero.items())},
-        )
+
 
     # Stage 4: Driver matching
     if force_driver_id is not None:
