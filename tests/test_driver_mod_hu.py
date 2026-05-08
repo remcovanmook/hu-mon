@@ -55,12 +55,22 @@ def _make_holding_block(series_code=0x0B, power=12000, device_type=6, fw="7.6.1.
     return block
 
 
-def _make_probe_ctx(block):
+def _make_probe_ctx(block, input_block=None):
+    """
+    Build a ProbeContext for _probe_series tests.
+
+    :param block:        Holding register block (ShineWifi FC03 space).
+    :param input_block:  FC04 input registers 3000-3029.  Defaults to
+                         a minimal block with status=1 at index 0.
+    """
+    if input_block is None:
+        input_block = [1] + [0] * 29   # status=Normal
     return ProbeContext(
         slave_id=1,
         supported_fcs={3, 4},
         holding_block=block,
         max_block_size=125,
+        input_block=input_block,
     )
 
 
@@ -69,46 +79,44 @@ def _make_probe_ctx(block):
 # ---------------------------------------------------------------------------
 
 class TestProbeSeriesMODHU(unittest.TestCase):
+    """
+    Tests for GrowattModHuDriver._probe_series.
+
+    The ShineWifi-X2 does not bridge Protocol II holding registers (FC03 0-124)
+    to the inverter, so series/device-type identification from the holding block
+    is not possible.  _probe_series now simply checks that ctx.input_block is
+    present (FC04 3000-3029 is accessible), which is already confirmed by
+    _is_growatt.  The old series/device-type checks have been removed.
+    """
 
     def _driver(self):
         return GrowattModHuDriver()
 
-    def test_happy_path_device_type_6(self):
-        block = _make_holding_block(series_code=0x0B, device_type=6)
-        ctx = _make_probe_ctx(block)
-        self.assertTrue(self._driver()._probe_series(ctx))
-
-    def test_happy_path_device_type_4(self):
-        block = _make_holding_block(series_code=0x0C, device_type=4)
-        ctx = _make_probe_ctx(block)
+    def test_happy_path_input_block_present(self):
+        ctx = _make_probe_ctx(_make_holding_block(), input_block=[1] + [0] * 29)
         self.assertTrue(self._driver()._probe_series(ctx))
 
     def test_all_three_phase_series_accepted(self):
+        # Series code is no longer checked here; all return True if
+        # input_block is present.
         driver = self._driver()
         for code in [0x0B, 0x0C, 0x0D, 0x10, 0x11]:
             block = _make_holding_block(series_code=code, device_type=6)
-            ctx = _make_probe_ctx(block)
+            ctx = _make_probe_ctx(block, input_block=[1] + [0] * 29)
             self.assertTrue(driver._probe_series(ctx), f"series_code={code:#x}")
 
-    def test_single_phase_series_rejected(self):
-        # MIN (0x05) and MIC (0x0F) are not handled by this driver.
-        for code in [0x05, 0x0F]:
-            block = _make_holding_block(series_code=code, device_type=6)
-            ctx = _make_probe_ctx(block)
-            self.assertFalse(self._driver()._probe_series(ctx), f"series_code={code:#x}")
-
-    def test_unknown_device_type_rejected(self):
-        block = _make_holding_block(series_code=0x0B, device_type=0)
-        ctx = _make_probe_ctx(block)
+    def test_none_input_block_rejected(self):
+        # Build ctx directly so input_block is really None (helper defaults to [1]+[0]*29).
+        ctx = ProbeContext(slave_id=1, supported_fcs={3, 4},
+                           holding_block=_make_holding_block(),
+                           max_block_size=125, input_block=None)
         self.assertFalse(self._driver()._probe_series(ctx))
 
-    def test_none_block_rejected(self):
-        ctx = ProbeContext(slave_id=1, supported_fcs={3, 4}, holding_block=None, max_block_size=0)
-        self.assertFalse(self._driver()._probe_series(ctx))
+    def test_none_holding_block_accepted(self):
+        # Holding block absence is fine — only input_block matters now.
+        ctx = _make_probe_ctx(None, input_block=[1] + [0] * 29)
+        self.assertTrue(self._driver()._probe_series(ctx))
 
-    def test_short_block_rejected(self):
-        ctx = _make_probe_ctx([0] * 50)
-        self.assertFalse(self._driver()._probe_series(ctx))
 
 
 # ---------------------------------------------------------------------------

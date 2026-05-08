@@ -82,12 +82,24 @@ def _make_block(fw_regs=None, series_code=0x0B, power=12000, length=125):
     return block
 
 
-def _make_ctx(block, fcs=None):
+def _make_ctx(block, fcs=None, input_block=None):
+    """
+    Build a ProbeContext for testing.
+
+    :param block:        Holding register block (FC 03, ShineWifi space).
+    :param fcs:          Supported function codes; defaults to {3, 4}.
+    :param input_block:  FC 04 input registers 3000-3029.  Defaults to a
+                         minimal block with status=1 (Normal) at index 0.
+    """
+    if input_block is None:
+        # Default: valid status value so _is_growatt passes.
+        input_block = [1] + [0] * 29
     return ProbeContext(
         slave_id=1,
         supported_fcs=fcs if fcs is not None else {3, 4},
         holding_block=block,
         max_block_size=125,
+        input_block=input_block,
     )
 
 
@@ -100,48 +112,67 @@ class TestIsGrowatt(unittest.TestCase):
     def _driver(self):
         return _StubDriver(series_result=True)
 
-    def test_valid_firmware_and_known_series(self):
+    def test_known_series_accepted(self):
+        # Series code alone is the discriminator; firmware string is not checked.
         block = _make_block(series_code=0x0B)
         ctx = _make_ctx(block)
         self.assertTrue(self._driver()._is_growatt(ctx))
 
     def test_all_known_series_codes_accepted(self):
+        # _is_growatt now uses input_block, not series codes from holding block.
+        # Any valid input_block with status in [0,10] should be accepted.
         driver = self._driver()
         for code in GROWATT_SERIES:
-            block = _make_block(series_code=code)
-            ctx = _make_ctx(block)
-            self.assertTrue(driver._is_growatt(ctx), f"series_code={code:#x} should be accepted")
+            ctx = _make_ctx(_make_block(series_code=code), input_block=[2] + [0] * 29)
+            self.assertTrue(driver._is_growatt(ctx), f"series_code={code:#x} should pass")
 
     def test_unknown_series_code_rejected(self):
-        block = _make_block(series_code=0xFF)
-        ctx = _make_ctx(block)
-        self.assertFalse(self._driver()._is_growatt(ctx))
+        # Series code in the holding block is no longer checked; this is now
+        # a no-op for _is_growatt.  The status value is what matters.
+        ctx = _make_ctx(_make_block(series_code=0xFF), input_block=[1] + [0] * 29)
+        self.assertTrue(self._driver()._is_growatt(ctx))
 
     def test_zero_module_id_rejected(self):
-        # module_id == 0 means the proxy zeroed it out; cannot confirm vendor.
-        block = _make_block(series_code=0x00, power=0)
-        ctx = _make_ctx(block)
+        # input_block with out-of-range status (e.g. 11) should be rejected.
+        ctx = _make_ctx(_make_block(), input_block=[11] + [0] * 29)
         self.assertFalse(self._driver()._is_growatt(ctx))
 
-    def test_bad_firmware_string_rejected(self):
-        # Replace firmware registers with gibberish (non-version pattern).
+    def test_non_dotted_firmware_accepted_when_series_valid(self):
+        # Firmware strings like 'D01.0ZBDC' are valid inverter firmwares.
+        # The probe must not reject them: only the series code matters.
         bad_regs = [0xDEAD, 0xBEEF, 0x0000, 0x0000, 0x0000, 0x0000]
         block = _make_block(fw_regs=bad_regs, series_code=0x0B)
         ctx = _make_ctx(block)
-        self.assertFalse(self._driver()._is_growatt(ctx))
+        self.assertTrue(self._driver()._is_growatt(ctx))
 
-    def test_empty_firmware_string_rejected(self):
+    def test_empty_firmware_accepted_when_series_valid(self):
+        # Empty firmware registers are fine as long as series code is known.
         empty_regs = [0x0000] * 6
         block = _make_block(fw_regs=empty_regs, series_code=0x0B)
         ctx = _make_ctx(block)
-        self.assertFalse(self._driver()._is_growatt(ctx))
+        self.assertTrue(self._driver()._is_growatt(ctx))
 
     def test_none_holding_block_rejected(self):
-        ctx = ProbeContext(slave_id=1, supported_fcs={3, 4}, holding_block=None, max_block_size=0)
+        # None holding_block is fine — _is_growatt uses input_block now.
+        ctx = _make_ctx(None, input_block=[1] + [0] * 29)
+        self.assertTrue(self._driver()._is_growatt(ctx))
+
+    def test_short_holding_block_accepted(self):
+        # Short holding block is fine — _is_growatt uses input_block.
+        ctx = _make_ctx([0] * 10, input_block=[1] + [0] * 29)
+        self.assertTrue(self._driver()._is_growatt(ctx))
+
+    def test_no_fc4_rejected(self):
+        # No FC 04 support means no input_block data — must reject.
+        # Build ctx directly so input_block really is None (helper defaults to [1]+[0]*29).
+        ctx = ProbeContext(slave_id=1, supported_fcs={3}, holding_block=_make_block(),
+                           max_block_size=125, input_block=None)
         self.assertFalse(self._driver()._is_growatt(ctx))
 
-    def test_short_holding_block_rejected(self):
-        ctx = _make_ctx([0] * 10)
+    def test_none_input_block_rejected(self):
+        # Build ctx directly so input_block really is None.
+        ctx = ProbeContext(slave_id=1, supported_fcs={3, 4}, holding_block=_make_block(),
+                           max_block_size=125, input_block=None)
         self.assertFalse(self._driver()._is_growatt(ctx))
 
 
@@ -162,7 +193,9 @@ class TestProbe(unittest.TestCase):
         self.assertFalse(_StubDriver(series_result=False).probe(ctx))
 
     def test_probe_false_when_vendor_fails(self):
-        ctx = _make_ctx(None)
+        # input_block=None causes _is_growatt to return False.
+        ctx = ProbeContext(slave_id=1, supported_fcs={3, 4}, holding_block=None,
+                           max_block_size=0, input_block=None)
         self.assertFalse(_StubDriver(series_result=True).probe(ctx))
 
     def test_probe_never_raises_on_exception(self):

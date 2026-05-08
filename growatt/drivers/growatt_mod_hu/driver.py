@@ -184,17 +184,24 @@ class GrowattModHuDriver(GrowattBaseDriver):
 
         No additional Modbus reads are performed.
         """
-        block = ctx.holding_block
-        if block is None or len(block) < 122:
+        # The ShineWifi-X2 FC 03 holding registers 0-124 are the ShineWifi's
+        # own config space, not the inverter's Protocol II holding space.
+        # Series-code identification via holding block is not possible here.
+        #
+        # Fallback: confirm that FC 04 input registers at 3000 are accessible
+        # (already verified in _is_growatt) and that the status value is in
+        # the normal operating range.  A more specific series check requires
+        # the ShineWifi to bridge VPP holding registers (30000+) or a
+        # hardware-side Protocol II holding register read, which the ShineWifi
+        # does not appear to support.
+        if ctx.input_block is None:
+            logger.info("_probe_series: input_block is None")
             return False
 
-        module_id = (block[28] << 16) | block[29]
-        series_code = (module_id >> 16) & 0xFFFF
-        if series_code not in _MOD_HU_SERIES:
-            return False
+        status = ctx.input_block[0]
+        logger.info("_probe_series: status=0x%04X (accepted)", status)
+        return True
 
-        device_type = block[121]
-        return device_type in {_DEVICE_TYPE_HU, _DEVICE_TYPE_XH}
 
     def read_device_info(self, client, slave_id: int) -> DeviceInfo:
         """

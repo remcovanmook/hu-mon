@@ -184,17 +184,46 @@ def auto_select(
     supported_fcs = _detect_function_codes(client, slave_id)
     logger.info("Supported function codes: %s", sorted(supported_fcs))
 
-    # Stage 3: Holding block
+    # Stage 3: ShineWifi holding block (FC 03, 0–124).
+    # Note: on ShineWifi-X2 hardware, FC 03 registers 0-124 belong to the
+    # ShineWifi itself, NOT the inverter.  The block is retained for future
+    # use (e.g. reading ShineWifi config) but is NOT used for inverter identity.
     holding_block, max_block_size = None, 0
     if 3 in supported_fcs:
         holding_block, max_block_size = _read_holding_block(client, slave_id)
+
+    # Stage 3b: Inverter input block (FC 04, Protocol II address space).
+    # The ShineWifi-X2 bridges FC 04 input registers to the actual inverter.
+    # 30 registers at 3000 are enough for status + PV identification.
+    input_block = None
+    if 4 in supported_fcs:
+        try:
+            r = client.read_input_registers(3000, count=30, device_id=slave_id)
+            if not r.isError():
+                input_block = r.registers
+                logger.info("Input block 3000-3029: %d registers read", len(input_block))
+                non_zero_in = {3000 + i: v for i, v in enumerate(input_block) if v != 0}
+                logger.info("Input block non-zero: %s",
+                            {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero_in.items())})
+            else:
+                logger.warning("Input block 3000-3029 read error: %s", r)
+        except Exception as exc:
+            logger.warning("Input block 3000-3029 exception: %s", exc)
 
     ctx = ProbeContext(
         slave_id=slave_id,
         supported_fcs=supported_fcs,
         holding_block=holding_block,
         max_block_size=max_block_size,
+        input_block=input_block,
     )
+
+    if holding_block:
+        non_zero = {i: v for i, v in enumerate(holding_block) if v != 0}
+        logger.info(
+            "Holding block non-zero registers (reg: value): %s",
+            {f"reg{k}": f"0x{v:04X}({v})" for k, v in sorted(non_zero.items())},
+        )
 
     # Stage 4: Driver matching
     if force_driver_id is not None:

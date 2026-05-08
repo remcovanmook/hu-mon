@@ -56,7 +56,7 @@ def main():
     driver, slave_id = auto_select(probe_client, force_driver_id=args.driver)
     proxy_cfg = driver.proxy_config
     probe_client.close()
-    logger.info("Driver: %s  Proxy ranges: %s", driver.driver_id, proxy_cfg.ranges)
+    logger.info("Driver: %s  Proxy address_map: %s", driver.driver_id, proxy_cfg.address_map)
 
     # 1. Start Collector thread
     threading.Thread(
@@ -75,7 +75,7 @@ def main():
         daemon=True,
         name="growatt-proxy"
     ).start()
-    logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, proxy_cfg.slave_id)
+    logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, slave_id)
 
     # 3. Start MQTT Exporter (Optional)
     if args.mqtt_host:

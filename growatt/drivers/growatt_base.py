@@ -16,7 +16,6 @@ generic codec.
 Known Growatt series codes (Holding Regs 28-29, upper 16 bits of module_id):
 """
 
-import re
 from abc import abstractmethod
 
 from growatt.drivers.base import BaseDriver, ProbeContext
@@ -37,12 +36,9 @@ GROWATT_SERIES = {
     0x11: "MAX",
 }
 
-# Firmware version pattern used by all known Growatt Protocol II devices.
-# Format: one or more dotted numeric segments, e.g. "7.6.1.8" or "1.24".
-_FW_PATTERN = re.compile(r'^\d+(\.\d+)+$')
-
 # Sentinel value used in Growatt firmware to indicate "no data" / sleep mode.
 _SENTINEL = 0xFFFF
+
 
 
 # ---------------------------------------------------------------------------
@@ -115,46 +111,56 @@ class GrowattBaseDriver(BaseDriver):
         Returns False immediately if the holding block is absent or the
         device does not look like a Growatt.  Never raises.
         """
+        import logging
+        _log = logging.getLogger(__name__)
         try:
             if not self._is_growatt(ctx):
+                _log.info("%s: _is_growatt() returned False", self.driver_id)
                 return False
-            return self._probe_series(ctx)
-        except Exception:
+            result = self._probe_series(ctx)
+            if not result:
+                _log.info("%s: _probe_series() returned False", self.driver_id)
+            return result
+        except Exception as exc:
+            _log.info("%s: probe() raised %s: %s", self.driver_id, type(exc).__name__, exc)
             return False
 
     def _is_growatt(self, ctx: ProbeContext) -> bool:
         """
         Vendor-level heuristic: does the ProbeContext look like a Growatt?
 
-        Checks two things from the holding block (Regs 0–124):
-        1. Firmware string (Regs 9–14) must decode to a dotted-numeric
-           version pattern (e.g. '7.6.1.8').
-        2. The upper 16 bits of the module_id (Regs 28–29) must map to a
-           known Growatt series code.
+        Uses ctx.input_block (FC 04, registers 3000-3029), which the
+        ShineWifi-X2 bridges directly to the inverter.  FC 03 holding
+        registers 0-124 belong to the ShineWifi itself and cannot be used
+        for inverter identification.
 
-        Returns False (never raises) if the holding block is absent or
-        either heuristic fails.
+        The check: FC 04 responded (input_block is not None) AND the status
+        register at 3000 (input_block[0]) is in the Protocol II defined range
+        0-10.  Any valid Growatt Protocol II inverter will satisfy this.
+
+        Returns False (never raises) on any uncertainty.
 
         :param ctx: ProbeContext from the probe pipeline.
         """
-        block = ctx.holding_block
-        if block is None or len(block) < 122:
+        import logging
+        _log = logging.getLogger(__name__)
+
+        if 4 not in ctx.supported_fcs:
+            _log.info("_is_growatt: FC 04 not supported")
             return False
 
-        # Check firmware version string (Regs 9–14).
-        fw = ascii_regs(block[9:15])
-        if not _FW_PATTERN.match(fw):
+        if ctx.input_block is None:
+            _log.info("_is_growatt: input_block (FC04 3000-3029) is None")
             return False
 
-        # Check series code from module_id (Regs 28–29).
-        module_id = u32_be(block[28], block[29])
-        if module_id == 0:
-            return False
-        series_code = (module_id >> 16) & 0xFFFF
-        if series_code not in GROWATT_SERIES:
+        status = ctx.input_block[0]
+        if status > 10:
+            _log.info("_is_growatt: status register 3000 = %d is out of range [0,10]", status)
             return False
 
+        _log.info("_is_growatt: OK — status=0x%04X FC04 3000-3029 present", status)
         return True
+
 
     @abstractmethod
     def _probe_series(self, ctx: ProbeContext) -> bool:

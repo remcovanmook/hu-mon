@@ -66,6 +66,10 @@ class ProbeContext:
     supported_fcs: set
     holding_block: Optional[list]
     max_block_size: int
+    input_block: Optional[list] = field(default=None)
+    """Registers 3000–3029 read via FC 04, or None if FC 04 was unavailable.
+    Contains inverter-side data (status, PV power) from Protocol II address
+    space, which the ShineWifi-X2 bridges correctly unlike FC 03."""
 
 
 @dataclass
