@@ -22,7 +22,7 @@ from growatt.drivers.growatt_vpp.driver import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_ctx(vpp_dtc=None, input_block=None):
+def _make_ctx(vpp_dtc=None, input_block=None, vpp_protocol_version=202):
     """Build a ProbeContext with enough state for VPP probe tests."""
     # input_block defaults to a valid Protocol II status (status=5 → in [0,10])
     if input_block is None:
@@ -34,6 +34,7 @@ def _make_ctx(vpp_dtc=None, input_block=None):
         max_block_size=64,
         input_block=input_block,
         vpp_dtc=vpp_dtc,
+        vpp_protocol_version=vpp_protocol_version,
     )
 
 
@@ -108,23 +109,31 @@ class TestProbeSeriesVPP(unittest.TestCase):
     def setUp(self):
         self.driver = GrowattVppDriver()
 
-    def test_known_dtc_accepted(self):
-        ctx = _make_ctx(vpp_dtc=5401)
+    def test_valid_vpp_version_accepted(self):
+        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=202)
         self.assertTrue(self.driver._probe_series(ctx))
 
-    def test_none_dtc_rejected(self):
-        ctx = _make_ctx(vpp_dtc=None)
+    def test_no_vpp_version_rejected(self):
+        """Devices without a plausible 30099 value are not VPP."""
+        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=None)
         self.assertFalse(self.driver._probe_series(ctx))
 
-    def test_unknown_dtc_accepted_via_heuristic(self):
-        """Unknown DTC codes are accepted and inferred, not hard-rejected."""
-        ctx = _make_ctx(vpp_dtc=9999)
+    def test_garbage_vpp_version_rejected(self):
+        """Out-of-range 30099 (e.g. 0 or random non-VPP value) is rejected."""
+        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=0)
+        self.assertFalse(self.driver._probe_series(ctx))
+        ctx = _make_ctx(vpp_dtc=5401, vpp_protocol_version=9999)
+        self.assertFalse(self.driver._probe_series(ctx))
+
+    def test_unknown_dtc_accepted_when_version_valid(self):
+        """Unknown DTC is fine as long as protocol version is plausible."""
+        ctx = _make_ctx(vpp_dtc=9999, vpp_protocol_version=201)
         self.assertTrue(self.driver._probe_series(ctx))
 
     def test_all_known_dtcs_accepted(self):
         for dtc in _VPP_DTC_TABLE:
             with self.subTest(dtc=dtc):
-                ctx = _make_ctx(vpp_dtc=dtc)
+                ctx = _make_ctx(vpp_dtc=dtc, vpp_protocol_version=202)
                 self.assertTrue(self.driver._probe_series(ctx))
 
 

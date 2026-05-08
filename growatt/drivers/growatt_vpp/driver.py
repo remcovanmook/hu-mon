@@ -218,34 +218,41 @@ class GrowattVppDriver(GrowattBaseDriver):
 
     def _probe_series(self, ctx: ProbeContext) -> bool:
         """
-        VPP series check: succeeds when ``ctx.vpp_dtc`` is a recognised DTC
-        or can be inferred via the xx00/xx01 EPS-encoding convention.
+        VPP series check: succeeds when the device reports a plausible VPP
+        protocol version at FC03 30099 (ctx.vpp_protocol_version in 200-299).
 
-        Called only if ``_is_growatt()`` returned True (Protocol II status
-        register confirms vendor identity).  A non-None DTC at FC03 30000
-        is sufficient to confirm VPP capability; unknown codes fall back to
-        :func:`_dtc_infer_entry` so new hardware is not silently rejected.
+        This is the definitive test.  A non-VPP Growatt device will have zero
+        or garbage at 30099; only devices implementing the VPP register map
+        (V2.00+) will return a value in the expected range.
+
+        ctx.vpp_dtc (FC03 30000) is logged for model identification but is
+        no longer the hard gate — unknown DTCs are handled gracefully in
+        read_device_info via _dtc_infer_entry().
 
         :param ctx: ProbeContext populated by registry Stages 1-3c.
         :returns:   True if this is a VPP-capable Growatt inverter.
         """
-        if ctx.vpp_dtc is None:
-            logger.info("growatt_vpp: vpp_dtc is None — no VPP registers")
+        ver = ctx.vpp_protocol_version
+        if ver is None or not (200 <= ver <= 299):
+            logger.info(
+                "growatt_vpp: 30099=%s — not a VPP device",
+                ver if ver is not None else "None",
+            )
             return False
-        entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc)
-        if entry is None:
-            entry = _dtc_infer_entry(ctx.vpp_dtc)
-            logger.warning(
-                "growatt_vpp: DTC 0x%04X (%d) not in table — "
-                "inferred has_eps=%s phases=%d (heuristic; add to _VPP_DTC_TABLE)",
-                ctx.vpp_dtc, ctx.vpp_dtc, entry.has_eps, entry.phases,
+
+        entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc) if ctx.vpp_dtc else None
+        if entry:
+            logger.info(
+                "growatt_vpp: VPP V%d.%02d, DTC %d → %s, has_eps=%s, phases=%d",
+                ver // 100, ver % 100, ctx.vpp_dtc, entry.series, entry.has_eps, entry.phases,
             )
         else:
             logger.info(
-                "growatt_vpp: DTC %d → %s, has_eps=%s, phases=%d",
-                ctx.vpp_dtc, entry.series, entry.has_eps, entry.phases,
+                "growatt_vpp: VPP V%d.%02d, DTC %s (unknown; will infer in read_device_info)",
+                ver // 100, ver % 100, ctx.vpp_dtc,
             )
         return True
+
 
     # ------------------------------------------------------------------
     # Device info

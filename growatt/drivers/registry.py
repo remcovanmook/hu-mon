@@ -20,10 +20,12 @@ Stage 3b — Inverter input block (FC 04, 3000–3029)
     ShineWifi bridges these to the actual inverter. Used by GrowattBaseDriver
     to confirm vendor identity via the Protocol II status register.
 
-Stage 3c — VPP DTC (FC 03, 30000)
-    Reads Device Type Code from the VPP holding register space.  Non-zero
-    means VPP Protocol V2.01+ is supported.  Stored in ctx.vpp_dtc and used
-    by GrowattVppDriver._probe_series().
+Stage 3c — VPP DTC + Protocol Version (FC 03, 30000 + 30099)
+    Reads the full 100-register Basic Parameter block.  DTC from 30000 is
+    used for model metadata (series, phases, has_eps).  Protocol Version from
+    30099 (e.g. 202 = V2.02) is the primary identifier: a value in 200-299
+    confirms VPP capability and is stored in ctx.vpp_protocol_version.
+    ctx.vpp_dtc is retained for use by GrowattVppDriver._probe_series().
 
 Stage 4 — Driver matching
     Iterates DRIVER_REGISTRY in order.  Returns the first driver whose
@@ -218,19 +220,29 @@ def auto_select(
         except Exception as exc:
             logger.warning("Input block 3000-3029 exception: %s", exc)
 
-    # Stage 3c: VPP DTC (FC 03, register 30000).
-    # A non-zero value confirms VPP Protocol V2.01+ support.
+    # Stage 3c: VPP DTC (FC 03, register 30000) and Protocol Version (30099).
+    # Reading the full 100-register block saves a round-trip and gives us both.
+    # A protocol version in range 200-299 is the definitive VPP identifier.
     vpp_dtc = None
+    vpp_protocol_version = None
     if 3 in supported_fcs:
         try:
-            r = client.read_holding_registers(30000, count=1, device_id=slave_id)
-            if not r.isError() and r.registers[0] != 0:
-                vpp_dtc = r.registers[0]
-                logger.info("VPP DTC: %d (0x%04X)", vpp_dtc, vpp_dtc)
+            r = client.read_holding_registers(30000, count=100, device_id=slave_id)
+            if not r.isError():
+                dtc = r.registers[0]
+                ver = r.registers[99]
+                if dtc != 0:
+                    vpp_dtc = dtc
+                    logger.info("VPP DTC: %d (0x%04X)", vpp_dtc, vpp_dtc)
+                if 200 <= ver <= 299:
+                    vpp_protocol_version = ver
+                    logger.info("VPP Protocol Version: %d (V%d.%02d)", ver, ver // 100, ver % 100)
+                else:
+                    logger.debug("VPP 30099=%d — not a plausible VPP version", ver)
             else:
-                logger.debug("VPP DTC: register 30000 returned zero or error")
+                logger.debug("VPP block 30000-30099 returned error")
         except Exception as exc:
-            logger.debug("VPP DTC read failed: %s", exc)
+            logger.debug("VPP block read failed: %s", exc)
 
     ctx = ProbeContext(
         slave_id=slave_id,
@@ -239,6 +251,7 @@ def auto_select(
         max_block_size=max_block_size,
         input_block=input_block,
         vpp_dtc=vpp_dtc,
+        vpp_protocol_version=vpp_protocol_version,
     )
 
     if holding_block:
