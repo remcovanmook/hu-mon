@@ -5,17 +5,18 @@ GrowattVppDriver — telemetry driver for Growatt inverters supporting
 VPP Protocol V2.01 or later (identified via DTC at FC 03 register 30000).
 
 Primary register source: VPP (FC03 30000+, FC04 31000+).
-Protocol II FC04 supplements: PV energy + boost temp (3049-3095),
-EPS data (3130-3159).  FC03 0-124 is the ShineWifi's own space and is
-not used for inverter data.
+Protocol II FC04 supplements: per-phase L-N voltages (3026-3035),
+PV energy + boost temp (3049-3095), EPS data (3130-3159).
+FC03 0-124 is the ShineWifi's own space and is not used for inverter data.
 
 Poll segments
 -------------
-S1  FC04  31000-31059  Status + PV strings + total PV power       (mandatory)
-S2  FC04  31100-31125  AC / meter / freq / grid V,A / temp / kWh  (mandatory)
-S3  FC04  31200-31229  Battery 1 live data                        (soft-fail)
-S4  FC04  3049-3095    PV energy kWh + boost temp (Protocol II)   (soft-fail)
-S5  FC04  3130-3159    EPS V/A/power (Protocol II, has_eps only)  (soft-fail)
+S0  FC04  3026-3035   Per-phase L-N voltages from Protocol II          (soft-fail)
+S1  FC04  31000-31059  Status + PV strings + total PV power             (mandatory)
+S2  FC04  31100-31125  AC / meter / freq / L-L voltages / temp / kWh   (mandatory)
+S3  FC04  31200-31229  Battery 1 live data                              (soft-fail)
+S4  FC04  3049-3095    PV energy kWh + boost temp (Protocol II)         (soft-fail)
+S5  FC04  3130-3159    EPS V/A/power (Protocol II, has_eps only)        (soft-fail)
 """
 
 import json
@@ -284,27 +285,38 @@ class GrowattVppDriver(GrowattBaseDriver):
         Execute one full VPP telemetry poll cycle.
 
         Segment reads:
-          S1  FC04  31000-31059  Status + PV strings + total PV power  (mandatory)
-          S2  FC04  31100-31125  AC / meter / freq / grid / temp / kWh (mandatory)
-          S3  FC04  31200-31229  Battery 1                             (soft-fail)
-          S4  FC04  3049-3095    PV energy kWh + boost temp            (soft-fail)
-          S5  FC04  3130-3159    EPS data, only when has_eps=True      (soft-fail)
+          S0  FC04  3026-3035    Protocol II per-phase L-N voltages       (soft-fail)
+          S1  FC04  31000-31059  Status + PV strings + total PV power     (mandatory)
+          S2  FC04  31100-31125  AC / meter / freq / L-L V / temp / kWh  (mandatory)
+          S3  FC04  31200-31229  Battery 1                                (soft-fail)
+          S4  FC04  3049-3095    PV energy kWh + boost temp               (soft-fail)
+          S5  FC04  3130-3159    EPS data, only when has_eps=True         (soft-fail)
 
-        S4 and S5 use Protocol II FC04 addresses — they are the only fields
-        without a VPP equivalent.  All reads go through the same ShineWifi
-        TCP endpoint.
+        S0 and S4/S5 use Protocol II FC04 addresses.  All reads go through
+        the same ShineWifi TCP endpoint.
 
-        Per-string PV power: computed as V × I (DC, no power factor).
-        Per-phase AC power: derived as (V_LL / √3) × I × PF where
-          PF = ac_active_w / |S|, using active and reactive power from S2.
-        Grid voltages: Derived as L-N (≈242 V) by dividing VPP L-L registers
-        (31106-31108, AB/BC/CA) by √3.  The VPP spec provides no separate L-N
-        registers for 3-phase devices.
+        Per-string PV power: V × I (DC, no power factor).
+        Grid voltages: L-N from Protocol II registers 3026/3030/3034 (S0).
+          If S0 fails, falls back to VPP L-L registers 31106-31108 ÷ √3
+          (approximation valid only for a balanced system).
+        Per-phase AC power: V_LN × I × PF where PF = P / |S|.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address.
         :raises ModbusIOException: If S1 or S2 fails.
         """
+        # S0: Protocol II per-phase L-N voltages (FC04 3026-3035, 10 registers, soft-fail).
+        # Layout: [Vac1, Iac1, Pac1_H, Pac1_L, Vac2, Iac2, Pac2_H, Pac2_L, Vac3, Iac3]
+        # Offsets 0/4/8 give actual measured L-N voltages for L1/L2/L3.
+        s0 = None
+        try:
+            r = client.read_input_registers(3026, count=10, device_id=slave_id)
+            if not r.isError():
+                s0 = r.registers
+        except Exception as exc:
+            logger.debug("growatt_vpp: S0 (3026-3035) failed: %s", exc)
+        time.sleep(_INTER_SEGMENT_SLEEP)
+
         # S1: Status + PV (31000-31059, 60 registers)
         r1 = client.read_input_registers(31000, count=60, device_id=slave_id)
         if r1.isError():
@@ -382,15 +394,23 @@ class GrowattVppDriver(GrowattBaseDriver):
         ac_reactive_var = _s32(s2[2], s2[3]) / 10.0   # 31102-31103
 
         reading.grid_freq = _u16(s2[5])  / 100.0   # 31105
-        # 31106-31108 give L-L voltages (AB/BC/CA ≈420 V on a 240 V TN network).
-        # The VPP spec has no separate L-N registers for 3-phase devices;
-        # divide by √3 to derive the L-N value (~242 V).
-        reading.grid_l1_v = (_u16(s2[6])  / 10.0) / _SQRT3  # 31106 L-L AB → L-N
-        reading.grid_l2_v = (_u16(s2[7])  / 10.0) / _SQRT3  # 31107 L-L BC → L-N
-        reading.grid_l3_v = (_u16(s2[8])  / 10.0) / _SQRT3  # 31108 L-L CA → L-N
         reading.grid_l1_a = _s16(s2[9])  / 10.0    # 31109
         reading.grid_l2_a = _s16(s2[10]) / 10.0    # 31110
         reading.grid_l3_a = _s16(s2[11]) / 10.0    # 31111
+
+        # Grid L-N voltages: read directly from Protocol II registers 3026/3030/3034 (S0).
+        # The VPP spec only provides L-L values (31106-31108); those cannot be reliably
+        # converted to individual L-N voltages for a potentially unbalanced system.
+        # Fall back to VPP L-L ÷ √3 only when S0 is unavailable.
+        if s0:
+            reading.grid_l1_v = _u16(s0[0]) / 10.0   # 3026 L1-N (0.1V)
+            reading.grid_l2_v = _u16(s0[4]) / 10.0   # 3030 L2-N (0.1V)
+            reading.grid_l3_v = _u16(s0[8]) / 10.0   # 3034 L3-N (0.1V)
+        else:
+            logger.warning("growatt_vpp: S0 unavailable — falling back to L-L/√3 approximation")
+            reading.grid_l1_v = (_u16(s2[6]) / 10.0) / _SQRT3   # 31106 L-L AB → L-N
+            reading.grid_l2_v = (_u16(s2[7]) / 10.0) / _SQRT3   # 31107 L-L BC → L-N
+            reading.grid_l3_v = (_u16(s2[8]) / 10.0) / _SQRT3   # 31108 L-L CA → L-N
 
         # VPP meter power: pos=import from grid → invert for GrowattReading (pos=export)
         reading.meter_total_w = -(_s32(s2[12], s2[13]) / 10.0)   # 31112-31113
@@ -443,6 +463,9 @@ class GrowattVppDriver(GrowattBaseDriver):
 
         # --- Raw register snapshot for the Modbus proxy ---
         raw: dict = {}
+        if s0:
+            for i, v in enumerate(s0):
+                raw[str(3026 + i)] = v
         for i, v in enumerate(s1):
             raw[str(31000 + i)] = v
         for i, v in enumerate(s2):
@@ -479,6 +502,7 @@ class GrowattVppDriver(GrowattBaseDriver):
                 slave_id: {
                     3: [(30000, 100)],
                     4: [
+                        (3026,  10),
                         (31000, 60),
                         (31100, 26),
                         (31200, 30),

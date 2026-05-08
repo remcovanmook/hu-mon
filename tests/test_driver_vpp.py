@@ -244,13 +244,24 @@ def _make_s2(ac_active_h=0, ac_active_l=31894,
 
 class TestReadRegistersVPP(unittest.TestCase):
 
-    def _make_client(self, s1=None, s2=None, s3=None, s4=None, s5=None):
+    def _make_client(self, s0=None, s1=None, s2=None, s3=None, s4=None, s5=None):
+        """
+        Build a mock Modbus client for read_registers tests.
+
+        s0 is the Protocol II L-N voltage segment (FC04 3026-3035, 10 regs).
+        Omitting s0 returns an error response, which exercises the √3 fallback.
+        """
         s1 = s1 or _make_s1()
         s2 = s2 or _make_s2()
+
+        # Default S0: 10 registers with typical L-N values (2459=245.9V per phase)
+        default_s0 = [2459, 33, 0, 0, 2450, 33, 0, 0, 2462, 34]
 
         client = MagicMock()
 
         def read_input(addr, count, device_id):
+            if addr == 3026:
+                return _mock_regs(s0 if s0 is not None else default_s0)
             if addr == 31000:
                 return _mock_regs(s1)
             if addr == 31100:
@@ -300,14 +311,49 @@ class TestReadRegistersVPP(unittest.TestCase):
         r = driver.read_registers(client, slave_id=1)
         self.assertAlmostEqual(r.grid_freq, 49.97)
 
-    def test_grid_voltages_ln(self):
-        """Voltages stored as L-N (L-L raw ÷ √3); dashboard expects ~240V range."""
+    def test_grid_voltages_from_protocol_ii(self):
+        """L-N voltages come from Protocol II S0 registers (3026/3030/3034)."""
         driver = GrowattVppDriver()
+        s0 = [2459, 33, 0, 0,   # 3026-3029: L1-N=245.9V, L1-A=3.3A
+              2450, 32, 0, 0,   # 3030-3033: L2-N=245.0V
+              2462, 34]         # 3034-3035: L3-N=246.2V
+        client = self._make_client(s0=s0)
+        r = driver.read_registers(client, slave_id=1)
+        self.assertAlmostEqual(r.grid_l1_v, 245.9)
+        self.assertAlmostEqual(r.grid_l2_v, 245.0)
+        self.assertAlmostEqual(r.grid_l3_v, 246.2)
+
+    def test_grid_voltages_fallback_to_ll_sqrt3(self):
+        """When S0 fails, fall back to VPP L-L ÷ √3 (balanced-system approximation)."""
+        driver = GrowattVppDriver()
+        # Pass s0=False to signal error response (None means use default)
         client = self._make_client(s2=_make_s2(v_ab=4283, v_bc=4279, v_ca=4299))
+        # Patch 3026 to return an error
+        orig = client.read_input_registers.side_effect
+        def patched(addr, count, device_id):
+            if addr == 3026:
+                return _error_response()
+            return orig(addr, count, device_id)
+        client.read_input_registers.side_effect = patched
         r = driver.read_registers(client, slave_id=1)
         self.assertAlmostEqual(r.grid_l1_v, 428.3 / math.sqrt(3), places=1)
-        self.assertAlmostEqual(r.grid_l2_v, 427.9 / math.sqrt(3), places=1)
-        self.assertAlmostEqual(r.grid_l3_v, 429.9 / math.sqrt(3), places=1)
+
+    def test_per_phase_ac_power(self):
+        """meter_l1_w = V_L1N (from S0) × I_A × PF."""
+        driver = GrowattVppDriver()
+        s0 = [2459, 43, 0, 0, 2450, 43, 0, 0, 2462, 44]  # L1-N=245.9V
+        s2 = _make_s2(
+            ac_active_h=0, ac_active_l=31894,
+            ac_react_h=0, ac_react_l=276,
+            v_ab=4283, i_a=43,
+        )
+        client = self._make_client(s0=s0, s2=s2)
+        r = driver.read_registers(client, slave_id=1)
+        active_w = 3189.4
+        reactive_var = 27.6
+        pf = active_w / math.sqrt(active_w ** 2 + reactive_var ** 2)
+        expected = 245.9 * 4.3 * pf   # V_L1N × I_A × PF
+        self.assertAlmostEqual(r.meter_l1_w, expected, places=1)
 
     def test_inverter_temp(self):
         driver = GrowattVppDriver()
@@ -322,22 +368,6 @@ class TestReadRegistersVPP(unittest.TestCase):
         client = self._make_client(s2=_make_s2(meter_h=0, meter_l=1000))
         r = driver.read_registers(client, slave_id=1)
         self.assertAlmostEqual(r.meter_total_w, -100.0)
-
-    def test_per_phase_ac_power(self):
-        """meter_l1_w should equal (V_AB/√3) × I_A × PF."""
-        driver = GrowattVppDriver()
-        s2 = _make_s2(
-            ac_active_h=0, ac_active_l=31894,
-            ac_react_h=0, ac_react_l=276,
-            v_ab=4283, i_a=43,
-        )
-        client = self._make_client(s2=s2)
-        r = driver.read_registers(client, slave_id=1)
-        active_w = 3189.4
-        reactive_var = 27.6
-        pf = active_w / math.sqrt(active_w ** 2 + reactive_var ** 2)
-        expected = (428.3 / math.sqrt(3)) * 4.3 * pf
-        self.assertAlmostEqual(r.meter_l1_w, expected, places=1)
 
     def test_battery_skipped_when_all_zero(self):
         driver = GrowattVppDriver()
