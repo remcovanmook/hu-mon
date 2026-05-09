@@ -404,11 +404,22 @@ function connectSSE() {
     es.addEventListener("reading", (e) => {
         const d = JSON.parse(e.data);
         const ts = d.ts;
-        
-        
+
+        // ── Status indicator ─────────────────────────────────────────────────
+        // Update unconditionally and first, before any chart rendering that
+        // could throw and prevent this from running.
+        const _statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+        const _sl  = document.getElementById("status-label");
+        const _dot = document.getElementById("status-dot");
+        if (_sl)  _sl.innerText = _statusStr;
+        if (_dot) {
+            _dot.classList.remove("inv-normal", "inv-bypass", "inv-fault", "inv-other");
+            _dot.classList.add(inverterDotClass(_statusStr));
+        }
+
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         updateDOM("sum-pv-val", d.pv_total_w.toFixed(0)); // Header of PV tab
-        updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
+        updateDOM("sum-pv-stat", _statusStr);
         updateDOM("sum-pv-today", d.pv_today_kwh.toFixed(1));
         updateDOM("sum-pv-total", d.pv_total_kwh.toFixed(0));
 
@@ -549,15 +560,10 @@ function connectSSE() {
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
         
-        Object.values(charts).forEach(c => { if(c) c.update('none'); });
-        
-        const sl  = document.getElementById("status-label");
-        const dot = document.getElementById("status-dot");
-        if (sl)  sl.innerText = statusStr;
-        if (dot) {
-            // Remove all inverter state classes then apply the current one.
-            dot.classList.remove("inv-normal", "inv-bypass", "inv-fault", "inv-other");
-            dot.classList.add(inverterDotClass(statusStr));
+        try {
+            Object.values(charts).forEach(c => { if(c) c.update('none'); });
+        } catch (err) {
+            console.warn("chart.update error:", err);
         }
 
         // --- Cute Flow Diagram Animation ---
