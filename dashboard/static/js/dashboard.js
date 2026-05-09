@@ -126,7 +126,7 @@ function chartPalette() {
     l1:        v("--phase-l1") || '#ef4444',
     l2:        v("--phase-l2") || '#eab308',
     l3:        v("--phase-l3") || '#3b82f6',
-    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', pv4: '#14b8a6', load: '#a855f7'
+    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', load: '#a855f7'
   };
 }
 let COLORS = chartPalette();
@@ -215,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
         // Clear extremes
-        for(let i=0; i<4; i++) { extremes.pv_v[i] = {min: Infinity, max: -Infinity}; extremes.pv_c[i] = {min: Infinity, max: -Infinity}; }
+        for(let i=0; i<3; i++) { extremes.pv_v[i] = {min: Infinity, max: -Infinity}; extremes.pv_c[i] = {min: Infinity, max: -Infinity}; }
         for(let i=0; i<3; i++) { extremes.grid_v[i] = {min: Infinity, max: -Infinity}; extremes.grid_c[i] = {min: Infinity, max: -Infinity};
             extremes.grid_ll[i] = {min: Infinity, max: -Infinity};
             extremes.eps_v[i] = {min: Infinity, max: -Infinity};
@@ -233,7 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(!el) return;
         
         const colorMap = {
-            'PV':  [COLORS.pv1, COLORS.pv2, COLORS.pv3, COLORS.pv4],
+            'PV':  [COLORS.pv1, COLORS.pv2, COLORS.pv3],
             'L':   [COLORS.l1, COLORS.l2, COLORS.l3],
             'LL':  [COLORS.l1, COLORS.l2, COLORS.l3],
             'eps': [COLORS.l1, COLORS.l2, COLORS.l3]
@@ -269,8 +269,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    createGroup('pv-v-cards', 'Voltage', 'V', 4, 'PV');
-    createGroup('pv-a-cards', 'Current', 'A', 4, 'PV');
+    createGroup('pv-v-cards', 'Voltage', 'V', 3, 'PV');
+    createGroup('pv-a-cards', 'Current', 'A', 3, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
     createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['RS', 'ST', 'TR']);
@@ -285,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     charts.pv = createChart('chart-pv', [
         { label: 'Total', color: COLORS.delivered, borderWidth: 2 },
         { label: 'PV1', color: COLORS.pv1 }, { label: 'PV2', color: COLORS.pv2 },
-        { label: 'PV3', color: COLORS.pv3 }, { label: 'PV4', color: COLORS.pv4 }
+        { label: 'PV3', color: COLORS.pv3 }
     ]);
     charts.grid = createChart('chart-grid', [
         {label: 'Net Grid', color: COLORS.net},
@@ -404,10 +404,10 @@ async function loadHistory(hours = 24) {
         if(data.length === 0) return;
         
         const labels = [];
-        const ds = { overview: [[],[],[]], pv: [[],[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]], freq: [[]], invTemp: [[]], bstTemp: [[]] };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]], freq: [[]], invTemp: [[]], bstTemp: [[]] };
         
         // Initialize arrays for sparklines
-        for(let i=1; i<=4; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
+        for(let i=1; i<=3; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
         for(let i=1; i<=3; i++) { ds[`chart-v-l${i}`] = [[]]; ds[`chart-c-l${i}`] = [[]]; }
         const llKeys = ['rs', 'st', 'tr'];
         for(let i=1; i<=3; i++) { ds[`chart-v-ll${i}`] = [[]]; }
@@ -426,7 +426,7 @@ async function loadHistory(hours = 24) {
             lastStatus = statusStr;
 
             ds.overview[0].push(Math.round(d.pv_total_w_mean)); ds.overview[1].push(Math.round(-d.meter_total_w_mean)); ds.overview[2].push(Math.round(d.eps_p_mean));
-            ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean)); ds.pv[4].push(Math.round(d.pv4_w_mean));
+            ds.pv[0].push(Math.round(d.pv_total_w_mean)); ds.pv[1].push(Math.round(d.pv1_w_mean)); ds.pv[2].push(Math.round(d.pv2_w_mean)); ds.pv[3].push(Math.round(d.pv3_w_mean));
             ds.grid[0].push(Math.round(-d.meter_total_w_mean)); ds.grid[1].push(Math.round(d.grid_l1_v_mean * d.grid_l1_a_mean)); ds.grid[2].push(Math.round(d.grid_l2_v_mean * d.grid_l2_a_mean)); ds.grid[3].push(Math.round(d.grid_l3_v_mean * d.grid_l3_a_mean));
             ds.eps[0].push(Math.round(d.eps_p_mean)); ds.eps[1].push(Math.round(d.eps_l1_v_mean * d.eps_l1_a_mean)); ds.eps[2].push(Math.round(d.eps_l2_v_mean * d.eps_l2_a_mean)); ds.eps[3].push(Math.round(d.eps_l3_v_mean * d.eps_l3_a_mean));
             let freq = d.grid_freq_mean === 0 ? null : d.grid_freq_mean;
@@ -434,7 +434,7 @@ async function loadHistory(hours = 24) {
             let bst = d.boost_temp_mean === 0 ? null : d.boost_temp_mean;
             ds.freq[0].push(freq); ds.invTemp[0].push(inv); ds.bstTemp[0].push(bst);
             
-            for(let i=1; i<=4; i++) {
+            for(let i=1; i<=3; i++) {
                 let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
                 ds[`chart-v-pv${i}`][0].push(v); ds[`chart-c-pv${i}`][0].push(c);
                 if(v < extremes.pv_v[i-1].min) extremes.pv_v[i-1].min = v;
@@ -719,7 +719,7 @@ function connectSSE() {
         
         // --- End Flow Diagram ---
 
-        for(let i=1; i<=4; i++) {
+        for(let i=1; i<=3; i++) {
             updateDOM(`pv${i}-v`, d[`pv${i}_v`].toFixed(1));
             updateDOM(`pv${i}-a`, d[`pv${i}_a`].toFixed(1));
             updateDOM(`pv${i}-w`, d[`pv${i}_w`].toFixed(0));
@@ -742,7 +742,7 @@ function connectSSE() {
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
         pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.eps_p)]);
-        pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w), Math.round(d.pv4_w)]);
+        pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w)]);
         pushChart(charts.grid, ts, [Math.round(-d.meter_total_w), Math.round(g1w), Math.round(g2w), Math.round(g3w)]);
         const e1w = (d.eps_l1_v || 0) * (d.eps_l1_a || 0);
         const e2w = (d.eps_l2_v || 0) * (d.eps_l2_a || 0);
