@@ -757,7 +757,12 @@ function connectSSE() {
         // Update wye diagram with phase-to-neutral voltages.
         // grid_l1/2/3_v are already V_LN values (derived by the driver
         // from V_LL via _ll_to_ln() when Protocol II phase regs are absent).
-        updateWyeDiagram(d.grid_l1_v || 0, d.grid_l2_v || 0, d.grid_l3_v || 0);
+        // grid_l1/2/3_v = V_LN (derived by driver); grid_ll_rs/st/tr_v = measured V_LL.
+        // Pass both so the wye diagram shows measured LL values directly.
+        updateWyeDiagram(
+          d.grid_l1_v || 0, d.grid_l2_v || 0, d.grid_l3_v || 0,
+          d.grid_ll_rs_v || 0, d.grid_ll_st_v || 0, d.grid_ll_tr_v || 0
+        );
 
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
@@ -894,11 +899,17 @@ function resizeNeutralCanvas() {
  * deviations are visible at normal EU voltages (~230 V). IEC EN 50160
  * tolerance bands are drawn at 207 / 230 / 253 V relative to the same base.
  *
- * @param {number} v1 - L1 phase-to-neutral RMS voltage (V).
- * @param {number} v2 - L2 phase-to-neutral RMS voltage (V).
- * @param {number} v3 - L3 phase-to-neutral RMS voltage (V).
+ * Chord labels use the directly measured line-to-line voltages (ll12, ll13,
+ * ll23) rather than values computed from V_LN so they match the L-L cards.
+ *
+ * @param {number} v1   - L1 phase-to-neutral RMS voltage (V).
+ * @param {number} v2   - L2 phase-to-neutral RMS voltage (V).
+ * @param {number} v3   - L3 phase-to-neutral RMS voltage (V).
+ * @param {number} ll12 - Measured V_RS (L1–L2) line voltage (V).
+ * @param {number} ll13 - Measured V_TR (L1–L3) line voltage (V).
+ * @param {number} ll23 - Measured V_ST (L2–L3) line voltage (V).
  */
-function drawWyeDiagram(v1, v2, v3) {
+function drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23) {
   if (!wyeCtx || !wyeCanvas) return;
   const dpr = window.devicePixelRatio || 1;
   const W = wyeCanvas.width / dpr, H = wyeCanvas.height / dpr;
@@ -923,9 +934,11 @@ function drawWyeDiagram(v1, v2, v3) {
   iecRing(30, "rgba(255,255,255,0.30)", [5, 3], "230 V", Math.PI * 0.2);
   ctx.beginPath(); ctx.arc(cx, cy, meanR, 0, 2 * Math.PI); ctx.strokeStyle = cD; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
   const chord = (pa, pb, col, lbl, ox, oy) => { ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([6, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.font = "bold 9px 'JetBrains Mono', monospace"; ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(lbl, (pa.x + pb.x) / 2 + ox, (pa.y + pb.y) / 2 + oy); };
-  chord(p1, p2, cl12, "L1\u2013L2 " + lineVoltage(v1, v2).toFixed(1) + " V",  14, -6);
-  chord(p1, p3, cl13, "L1\u2013L3 " + lineVoltage(v1, v3).toFixed(1) + " V", -14, -6);
-  chord(p2, p3, cl23, "L2\u2013L3 " + lineVoltage(v2, v3).toFixed(1) + " V",   0, 14);
+  // Chord labels use measured V_LL values for accuracy; the geometric chord
+  // position is still derived from V_LN phasor tips.
+  chord(p1, p2, cl12, "L1\u2013L2 " + (ll12 || lineVoltage(v1, v2)).toFixed(1) + " V",  14, -6);
+  chord(p1, p3, cl13, "L1\u2013L3 " + (ll13 || lineVoltage(v1, v3)).toFixed(1) + " V", -14, -6);
+  chord(p2, p3, cl23, "L2\u2013L3 " + (ll23 || lineVoltage(v2, v3)).toFixed(1) + " V",   0, 14);
   const vec = (p, col, lbl, mag) => { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke(); const a = Math.atan2(cy - p.y, p.x - cx), hs = 8; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - hs * Math.cos(a - 0.35), p.y + hs * Math.sin(a - 0.35)); ctx.lineTo(p.x - hs * Math.cos(a + 0.35), p.y + hs * Math.sin(a + 0.35)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill(); ctx.font = "bold 11px 'Inter', sans-serif"; ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(lbl + " " + mag.toFixed(1) + " V", p.x + (p.x - cx) * 0.18, p.y + (p.y - cy) * 0.18); };
   vec(p1, cl1, "L1", v1); vec(p2, cl2, "L2", v2); vec(p3, cl3, "L3", v3);
   const ns = neutralShift(v1, v2, v3), npx = cx + ns.re * scale, npy = cy - ns.im * scale;
@@ -940,15 +953,19 @@ function drawWyeDiagram(v1, v2, v3) {
 /**
  * Update all wye DOM stat elements and redraw both canvases.
  *
- * grid_l1/2/3_v are already V_LN values — the Growatt driver derives them
- * from V_LL (31106-31108) via _ll_to_ln() when Protocol II phase registers
- * (3026/3030/3034) are not available.
+ * v1/v2/v3 are V_LN values from the driver (grid_l1/2/3_v).
+ * ll12/ll13/ll23 are directly measured V_LL from the Growatt meter registers
+ * (31106-31108, R=L1, S=L2, T=L3): RS=L1-L2, ST=L2-L3, TR=L1-L3.
+ * Using measured LL values avoids round-trip error from V_LN derivation.
  *
- * @param {number} v1 - L1 phase-to-neutral RMS (V).
- * @param {number} v2 - L2 phase-to-neutral RMS (V).
- * @param {number} v3 - L3 phase-to-neutral RMS (V).
+ * @param {number} v1   - L1 phase-to-neutral RMS (V).
+ * @param {number} v2   - L2 phase-to-neutral RMS (V).
+ * @param {number} v3   - L3 phase-to-neutral RMS (V).
+ * @param {number} llRS - Measured V_RS = L1–L2 line voltage (V).
+ * @param {number} llST - Measured V_ST = L2–L3 line voltage (V).
+ * @param {number} llTR - Measured V_TR = L1–L3 line voltage (V).
  */
-function updateWyeDiagram(v1, v2, v3) {
+function updateWyeDiagram(v1, v2, v3, llRS, llST, llTR) {
   if (!v1 || !v2 || !v3) return;
   const IEC_NOM = 230, IEC_LL = 400;
   const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
@@ -960,14 +977,17 @@ function updateWyeDiagram(v1, v2, v3) {
     e.className = "wt-ideal " + (d >= 0 ? "wt-ideal--pos" : "wt-ideal--neg");
   };
   setIdeal("wye-ideal-l1", v1, IEC_NOM); setIdeal("wye-ideal-l2", v2, IEC_NOM); setIdeal("wye-ideal-l3", v3, IEC_NOM);
-  const ll12 = lineVoltage(v1, v2), ll13 = lineVoltage(v1, v3), ll23 = lineVoltage(v2, v3);
+  // Use measured V_LL directly; RS=L1-L2, ST=L2-L3, TR=L1-L3.
+  const ll12 = llRS || lineVoltage(v1, v2);
+  const ll23 = llST || lineVoltage(v2, v3);
+  const ll13 = llTR || lineVoltage(v1, v3);
   set("wye-diff-l12", ll12.toFixed(1)); set("wye-diff-l13", ll13.toFixed(1)); set("wye-diff-l23", ll23.toFixed(1));
   setIdeal("wye-ideal-l12", ll12, IEC_LL); setIdeal("wye-ideal-l13", ll13, IEC_LL); setIdeal("wye-ideal-l23", ll23, IEC_LL);
   const ns = neutralShift(v1, v2, v3), nMag = Math.hypot(ns.re, ns.im);
   set("wye-neutral-mag", nMag.toFixed(2));
   set("wye-neutral-ang", (Math.atan2(ns.im, ns.re) * 180 / Math.PI).toFixed(1));
   set("wye-imbalance",   voltageImbalance(v1, v2, v3).toFixed(2));
-  drawWyeDiagram(v1, v2, v3);
+  drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23);
   drawNeutralMini(ns.re, ns.im, nMag);
 }
 
