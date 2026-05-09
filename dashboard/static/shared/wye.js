@@ -18,7 +18,7 @@
  *   drawWyeDiagram, drawNeutralMini
  *   wyeScaleForWidth
  *   WYE_CEIL, WYE_IEC_MAX, WYE_TOP_PAD, WYE_BOT_PAD
- *   WYE_CSS (module-private colour token cache)
+ *   WYE_CSS (window-global colour token cache; populated by refreshWyeCSS)
  *
  * Load order: after theme.js and chart-utils.js, before app JS.
  */
@@ -44,9 +44,11 @@ const WYE_BOT_PAD = 14;
 /**
  * CSS colour token cache populated by refreshWyeCSS().
  * All draw functions read from this object so they pick up theme changes.
+ * Declared as var (not let/const) so it is accessible from other scripts
+ * loaded on the same page that reference WYE_CSS for lazy chart callbacks.
  * @type {object}
  */
-let WYE_CSS = {};
+var WYE_CSS = {};
 
 /**
  * Re-read CSS custom properties into WYE_CSS.

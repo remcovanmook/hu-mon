@@ -347,11 +347,14 @@ function initFlowScale() {
  * @param {string} id - Tab identifier matching the tab-btn-{id}/tab-{id} convention.
  */
 function switchTab(id) {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("tab-btn--active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.hidden = true);
+    document.querySelectorAll(".tab-btn").forEach(b => {
+        b.classList.remove("tab-btn--active");
+        b.setAttribute("aria-selected", "false");
+    });
+    document.querySelectorAll("[role='tabpanel']").forEach(c => { c.hidden = true; });
     const btn   = document.getElementById(`tab-btn-${id}`);
     const panel = document.getElementById(`tab-${id}`);
-    if (btn)   btn.classList.add("tab-btn--active");
+    if (btn)   { btn.classList.add("tab-btn--active"); btn.setAttribute("aria-selected", "true"); }
     if (panel) panel.hidden = false;
     document.dispatchEvent(new CustomEvent("dashboard:tabswitch", { detail: { id } }));
 }

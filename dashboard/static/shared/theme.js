@@ -16,10 +16,10 @@
 "use strict";
 
 /** Ordered theme identifiers. */
-const THEME_CYCLE = ["light", "dark", "auto"];
+var THEME_CYCLE = ["light", "dark", "auto"];
 
 /** Button label strings keyed by theme identifier. */
-const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
+var THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
 
 /**
  * Returns true when the effective resolved theme is dark.

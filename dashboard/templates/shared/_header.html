@@ -5,6 +5,7 @@
   Provides: logo, history-range selector, live clock, theme toggle, and
   connection status dot/label.  The logo-text slot can be overridden by
   the including template via the `logo_text` variable (default: "Dashboard").
+  The sub-label can be overridden with `logo_sub` (default: "Dashboard").
 #}
 <header class="header">
   <div class="header-inner">
@@ -15,7 +16,7 @@
         </svg>
       </div>
       <span class="logo-text">{{ logo_text | default("Dashboard") }}</span>
-      <span class="logo-sub">Dashboard</span>
+      <span class="logo-sub">{{ logo_sub | default("Dashboard") }}</span>
     </div>
     <div class="header-controls">
       <label class="range-label" for="history-range">History</label>
