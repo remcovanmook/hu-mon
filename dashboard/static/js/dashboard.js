@@ -38,13 +38,37 @@ function syncChartScales(chartArray, extremesArray, minFloor = -Infinity) {
   });
 }
 
+/**
+ * Return a hex color for the annotation line/badge matching the header dot.
+ *
+ * Reads CSS accent variables so it adapts to the active theme (light/dark).
+ *
+ * @param {string} statusStr - A value from STATUS_MAP or "UNKNOWN".
+ * @returns {string} Hex colour string.
+ */
+function statusAnnotationColor(statusStr) {
+  const v = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  if (statusStr === 'NORMAL') return v('--accent-green')  || '#22c55e';
+  if (statusStr === 'BYPASS') return '#166534';
+  if (statusStr === 'FAULT')  return v('--accent-red')    || '#ef4444';
+  return v('--accent-amber') || '#f59e0b';
+}
+
+/**
+ * Build a vertical line annotation for a status-change event.
+ *
+ * @param {number} tsMs      - Timestamp in milliseconds (x-axis value).
+ * @param {string} statusStr - Human-readable status label.
+ * @returns {object} Chart.js annotation descriptor.
+ */
 function buildStatusAnnotation(tsMs, statusStr) {
+  const hex = statusAnnotationColor(statusStr);
   return {
     type: "line", scaleID: "x", value: tsMs,
-    borderColor: "rgba(139, 92, 246, 0.5)", borderWidth: 1, borderDash: [4, 4],
+    borderColor: hex + '80', borderWidth: 1, borderDash: [4, 4],
     label: {
       display: true, content: statusStr, position: "start",  // top of vertical line
-      backgroundColor: "rgba(139, 92, 246, 0.8)", color: "#fff",
+      backgroundColor: hex + 'cc', color: "#fff",
       font: { size: 9, weight: "600" }, padding: { x: 4, y: 2 }, borderRadius: 4, rotation: -90
     }
   };
