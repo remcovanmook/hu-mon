@@ -1006,10 +1006,11 @@ html, body {
   align-items: center;
 }
 
-/** Square canvas container; canvas fills it 1:1. */
+/** Canvas container — height is set dynamically by resizeWyeCanvas() so it
+ * clips exactly at the 253 V ring bottom. min-height guards the pre-JS flash. */
 .wye-diagram-wrap {
   width: 380px;
-  height: 330px;
+  min-height: 200px;
   flex-shrink: 0;
   position: relative;
 }

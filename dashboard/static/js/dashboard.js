@@ -983,14 +983,41 @@ function initWyeDiagram() {
   }
 }
 
-/** Resize the main wye canvas pixel buffer to match CSS layout size. */
+/**
+ * Resize the main wye canvas pixel buffer.
+ *
+ * Canvas height is computed asymmetrically:
+ *   - Top padding (WYE_TOP_PAD) leaves room for the L1 vector label.
+ *   - cy is placed at TOP_PAD + CEIL*scale so the full vector domain fits above.
+ *   - Canvas is clipped just below the 253 V IEC ring (r = 53*scale) + BOT_PAD.
+ *
+ * The .wye-diagram-wrap height is updated via inline style so the card
+ * layout shrinks/grows to match without needing a fixed CSS height.
+ */
+const WYE_CEIL    = 65;   // scale domain ceiling (V above 200V base)
+const WYE_IEC_MAX = 53;   // 253 V ring radius above base
+const WYE_TOP_PAD = 26;   // px above the full CEIL tip (for L1 label)
+const WYE_BOT_PAD = 14;   // px below the 253 V ring bottom
+
+function wyeScaleForWidth(W) {
+  return (W * 0.43) / WYE_CEIL;
+}
+
 function resizeWyeCanvas() {
   if (!wyeCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr  = window.devicePixelRatio || 1;
   const rect = wyeCanvas.getBoundingClientRect();
-  wyeCanvas.width  = rect.width  * dpr;
-  wyeCanvas.height = rect.height * dpr;
+  if (rect.width < 10) return;  // guard: hidden tab returns zero rect
+  const W     = rect.width;
+  const scale = wyeScaleForWidth(W);
+  const cy    = WYE_TOP_PAD + WYE_CEIL * scale;
+  const H     = Math.ceil(cy + WYE_IEC_MAX * scale + WYE_BOT_PAD);
+  wyeCanvas.width  = Math.round(W   * dpr);
+  wyeCanvas.height = Math.round(H   * dpr);
   wyeCtx.scale(dpr, dpr);
+  // Drive the wrapper height so the surrounding card layout adjusts.
+  const wrap = wyeCanvas.closest('.wye-diagram-wrap');
+  if (wrap) wrap.style.height = H + 'px';
 }
 
 /** Resize the mini neutral-offset canvas pixel buffer. */
@@ -1023,11 +1050,14 @@ function resizeNeutralCanvas() {
 function drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23) {
   if (!wyeCtx || !wyeCanvas) return;
   const dpr = window.devicePixelRatio || 1;
-  const W = wyeCanvas.width / dpr, H = wyeCanvas.height / dpr;
-  const cx = W / 2, cy = H / 2;
-  const BASE = 200, CEIL = 65;
+  const W = wyeCanvas.width / dpr;
+  const BASE = 200, CEIL = WYE_CEIL;
+  const scale = wyeScaleForWidth(W);
+  const cx = W / 2;
+  // Asymmetric cy: enough space at top for L1 label; canvas clips below 253V ring.
+  const cy = WYE_TOP_PAD + CEIL * scale;
+  const H  = wyeCanvas.height / dpr;   // actual canvas height set by resizeWyeCanvas
   const dv1 = Math.max(v1 - BASE, 1), dv2 = Math.max(v2 - BASE, 1), dv3 = Math.max(v3 - BASE, 1);
-  const scale = (Math.min(W, H) * 0.43) / CEIL;
   const cl1 = WYE_CSS.cl1 || "#60a5fa", cl2 = WYE_CSS.cl2 || "#34d399", cl3 = WYE_CSS.cl3 || "#f59e0b";
   const cl12 = WYE_CSS.cl12 || "#818cf8", cl13 = WYE_CSS.cl13 || "#fb7185", cl23 = WYE_CSS.cl23 || "#a78bfa";
   const cN = WYE_CSS.neutral || "#f472b6", cG = WYE_CSS.grid || "rgba(255,255,255,0.06)";
