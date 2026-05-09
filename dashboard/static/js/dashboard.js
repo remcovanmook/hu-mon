@@ -93,6 +93,25 @@ const STATUS_MAP = {
     8: "OFF-GRID",  // battery only, off-grid
     9: "BYPASS",
 };
+
+/**
+ * Map an inverter status string to a CSS modifier class for the header dot.
+ *
+ * Classes correspond to CSS rules on .status-dot:
+ *   inv-normal  bright green  — PV/battery actively on-grid
+ *   inv-bypass  dark green    — power flowing through bypass relay
+ *   inv-fault   red           — hardware or protection fault
+ *   inv-other   amber         — standby, self-test, upgrade, off-grid, unknown
+ *
+ * @param {string} str - A value from STATUS_MAP or "UNKNOWN".
+ * @returns {string} CSS class name.
+ */
+function inverterDotClass(str) {
+    if (str === "NORMAL")  return "inv-normal";
+    if (str === "BYPASS")  return "inv-bypass";
+    if (str === "FAULT")   return "inv-fault";
+    return "inv-other";
+}
 const FAULT_MAP = {
     101: "Communication fault (Internal)",
     116: "EEPROM fault",
@@ -693,8 +712,14 @@ function connectSSE() {
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
         
-        const sl = document.getElementById("status-label");
-        if(sl) sl.innerText = statusStr;
+        const sl  = document.getElementById("status-label");
+        const dot = document.getElementById("status-dot");
+        if (sl)  sl.innerText = statusStr;
+        if (dot) {
+            // Remove all inverter state classes then apply the current one.
+            dot.classList.remove("inv-normal", "inv-bypass", "inv-fault", "inv-other");
+            dot.classList.add(inverterDotClass(statusStr));
+        }
 
         // --- Cute Flow Diagram Animation ---
         updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
