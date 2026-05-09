@@ -106,7 +106,7 @@ document.addEventListener("dashboard:tabswitch", ({ detail }) => {
 
 
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const toggleBtn = document.getElementById("theme-toggle");
     if (toggleBtn) {
         toggleBtn.addEventListener("click", cycleTheme);
@@ -270,7 +270,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const savedTab = localStorage.getItem('growatt-tab') || 'overview';
     switchTab(savedTab);
 
-    loadHistory(currentHours);
+    // Await history so lastStatus is correctly seeded before SSE connects.
+    // Connecting SSE before history loads risks lastStatus being set by the
+    // first live reading, causing the first real status-change to be missed.
+    await loadHistory(currentHours);
     connectSSE();
     recolorCharts();
 });
@@ -464,6 +467,9 @@ function connectSSE() {
                 if(chart) {
                     chart.options.scales.x.min = flooredMin;
                     chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations, ...statusAnnotations };
+                    // Render immediately so the marker is visible before the
+                    // bulk chart.update() at the end of the SSE handler.
+                    chart.update("none");
                 }
             });
         } else {
