@@ -389,6 +389,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     charts.freq = createChart('chart-freq', [{ label: 'Grid Freq', color: COLORS.pv1 }], false);
+    // Fixed Y range: nominal 50 Hz ± 0.25 Hz (EN 50160 nominal tolerance).
+    charts.freq.options.scales.y.min = 49.75;
+    charts.freq.options.scales.y.max = 50.25;
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
