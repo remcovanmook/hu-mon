@@ -48,10 +48,10 @@
     </div>
   </header>
 
-  <main class="main">
 
-    <!-- ── Summary strip (always visible) ─────────────────────────────── -->
-        <section class="section section--summary" aria-labelledby="summary-heading">
+  <!-- Sticky chrome: summary strip + tab bar remain visible while scrolling. -->
+  <div class="sticky-chrome">
+
       <h1 id="summary-heading" class="sr-only">Summary</h1>
       <div class="summary-strip">
         <!-- 1. Current Production -->
@@ -119,8 +119,7 @@
             </tbody>
           </table>
         </div>
-      </div>
-    </section>
+      </div><!-- /.summary-strip -->
 
         <!-- ── Tab bar ─────────────────────────────────────────────────────── -->
     <nav class="tab-bar" role="tablist" aria-label="Dashboard view">
@@ -129,6 +128,10 @@
       <button class="tab-btn" id="tab-btn-grid" role="tab" aria-selected="false" aria-controls="tab-grid">Grid Power</button>
       <button class="tab-btn" id="tab-btn-eps" role="tab" aria-selected="false" aria-controls="tab-eps">EPS Power</button>
     </nav>
+
+  </div><!-- /.sticky-chrome -->
+
+  <main class="main">
 
         <!-- ══ Tab 1: Overview ══════════════════════════════════════════════ -->
     <div id="tab-overview" class="tab-content tab-content--active" role="tabpanel" aria-labelledby="tab-btn-overview">
