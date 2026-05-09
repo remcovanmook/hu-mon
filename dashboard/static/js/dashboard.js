@@ -252,6 +252,7 @@ function switchTab(id) {
         resizeWyeCanvas();
         resizeNeutralCanvas();
     }
+    localStorage.setItem('growatt-tab', id);
 }
 
 
@@ -292,8 +293,9 @@ document.addEventListener("DOMContentLoaded", () => {
             extremes.eps_c[i] = {min: Infinity, max: -Infinity}; }
         statusAnnotations = {};
         lastStatus = null;
-        
+
         currentHours = hours;
+        localStorage.setItem('growatt-range', hours);
         loadHistory(hours);
     });
     
@@ -406,11 +408,26 @@ document.addEventListener("DOMContentLoaded", () => {
     tickClock();
     setInterval(tickClock, 1000);
 
+    // Restore history range from localStorage; fall back to the select's
+    // default value (24 h) if nothing has been saved yet.
+    const rangeEl = document.getElementById("history-range");
+    const savedRange = localStorage.getItem('growatt-range');
+    if (savedRange && rangeEl) {
+        rangeEl.value = savedRange;   // update the <select> display
+        currentHours = Number.parseInt(savedRange, 10);
+    }
+
+    // Restore the last active tab; fall back to 'overview'.
+    const savedTab = localStorage.getItem('growatt-tab') || 'overview';
+    switchTab(savedTab);
+
     loadHistory(currentHours);
     connectSSE();
     recolorCharts();
 });
 
+// currentHours is initialised from localStorage in DOMContentLoaded;
+// the literal 24 here acts as a safe default before that runs.
 let currentHours = 24;
 
 function createChart(id, series, showLegend = true) {
