@@ -392,6 +392,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fixed Y range: nominal 50 Hz ± 0.25 Hz (EN 50160 nominal tolerance).
     charts.freq.options.scales.y.min = 49.75;
     charts.freq.options.scales.y.max = 50.25;
+    charts.freq.options.scales.y.ticks = {
+        callback: (v) => v.toFixed(2),
+        maxTicksLimit: 6,
+    };
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
