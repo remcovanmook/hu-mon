@@ -1033,11 +1033,27 @@ function drawNeutralMini(re, im, mag) {
   ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 2 * Math.PI); ctx.fillStyle = cT; ctx.fill();
   const vx = cx + re * scale, vy = cy - im * scale;
   if (Math.hypot(vx - cx, vy - cy) > 1.5) {
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(vx, vy); ctx.strokeStyle = cN; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
-    const a2 = Math.atan2(cy - vy, vx - cx), hs = 6;
-    ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(vx - hs * Math.cos(a2 - 0.4), vy + hs * Math.sin(a2 - 0.4)); ctx.lineTo(vx - hs * Math.cos(a2 + 0.4), vy + hs * Math.sin(a2 + 0.4)); ctx.closePath(); ctx.fillStyle = cN; ctx.fill();
-    ctx.font = "bold 9px 'JetBrains Mono', monospace"; ctx.fillStyle = cN; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText(mag.toFixed(2) + " V", vx + (vx - cx) * 0.25, vy + (vy - cy) * 0.25 - 4); ctx.textBaseline = "alphabetic";
+    // Shaft: offset point → origin (arrowhead points at the balanced centre).
+    ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(cx, cy);
+    ctx.strokeStyle = cN; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
+
+    // Arrowhead at (cx, cy) — angle from offset point toward centre.
+    const a2 = Math.atan2(cy - vy, cx - vx), hs = 6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx - hs * Math.cos(a2 - 0.4), cy - hs * Math.sin(a2 - 0.4));
+    ctx.lineTo(cx - hs * Math.cos(a2 + 0.4), cy - hs * Math.sin(a2 + 0.4));
+    ctx.closePath(); ctx.fillStyle = cN; ctx.fill();
+
+    // Red dot at the offset point — "you are here".
+    ctx.beginPath(); ctx.arc(vx, vy, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = "#ef4444"; ctx.fill();
+
+    // Magnitude label nudged outward from the offset point (away from centre).
+    const lx = vx + (vx - cx) * 0.35, ly = vy + (vy - cy) * 0.35;
+    ctx.font = "bold 9px 'JetBrains Mono', monospace"; ctx.fillStyle = cN;
+    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+    ctx.fillText(mag.toFixed(2) + " V", lx, ly - 4); ctx.textBaseline = "alphabetic";
   } else {
     ctx.font = "9px 'JetBrains Mono', monospace"; ctx.fillStyle = cT; ctx.textAlign = "center"; ctx.fillText("balanced", cx, cy + 18);
   }
