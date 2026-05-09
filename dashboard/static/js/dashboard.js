@@ -126,7 +126,10 @@ function chartPalette() {
     l1:        v("--phase-l1") || '#ef4444',
     l2:        v("--phase-l2") || '#eab308',
     l3:        v("--phase-l3") || '#3b82f6',
-    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', load: '#a855f7'
+    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', load: '#a855f7',
+    ll12: v('--wye-l12') || '#a78bfa',
+    ll13: v('--wye-l13') || '#34d399',
+    ll23: v('--wye-l23') || '#fbbf24',
   };
 }
 let COLORS = chartPalette();
@@ -253,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const colorMap = {
             'PV':  [COLORS.pv1, COLORS.pv2, COLORS.pv3],
             'L':   [COLORS.l1, COLORS.l2, COLORS.l3],
-            'LL':  [COLORS.l1, COLORS.l2, COLORS.l3],
+            'LL':  [COLORS.ll12, COLORS.ll13, COLORS.ll23],
             'eps': [COLORS.l1, COLORS.l2, COLORS.l3]
         };
 
