@@ -1057,8 +1057,7 @@ function drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23) {
   ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI); ctx.fillStyle = cT; ctx.fill();
   ctx.font = "10px 'JetBrains Mono', monospace"; ctx.fillStyle = cT; ctx.textAlign = "center";
   ctx.fillText("mean " + ((v1 + v2 + v3) / 3).toFixed(1) + " V", cx, cy - 10);
-  ctx.font = "8px 'JetBrains Mono', monospace"; ctx.fillStyle = cD; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-  ctx.fillText("\u2212" + BASE + " V base", 6, H - 4); ctx.textBaseline = "alphabetic";
+  // −200 V display base label is rendered in the section heading (HTML), not on the canvas.
 }
 
 /**

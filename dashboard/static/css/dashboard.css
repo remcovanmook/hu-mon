@@ -490,6 +490,17 @@ html, body {
   margin-bottom: 14px;
 }
 
+/** Muted inline annotation inside a section-title (e.g. "−200 V display base"). */
+.section-subtitle {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-dim);
+  margin-left: 0.5em;
+}
+
 .section-hint {
   font-weight: 400;
   letter-spacing: 0;
