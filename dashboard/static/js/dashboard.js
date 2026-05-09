@@ -1027,7 +1027,7 @@ function drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23) {
   const cx = W / 2, cy = H / 2;
   const BASE = 200, CEIL = 65;
   const dv1 = Math.max(v1 - BASE, 1), dv2 = Math.max(v2 - BASE, 1), dv3 = Math.max(v3 - BASE, 1);
-  const scale = (Math.min(W, H) * 0.38) / CEIL;
+  const scale = (Math.min(W, H) * 0.43) / CEIL;
   const cl1 = WYE_CSS.cl1 || "#60a5fa", cl2 = WYE_CSS.cl2 || "#34d399", cl3 = WYE_CSS.cl3 || "#f59e0b";
   const cl12 = WYE_CSS.cl12 || "#818cf8", cl13 = WYE_CSS.cl13 || "#fb7185", cl23 = WYE_CSS.cl23 || "#a78bfa";
   const cN = WYE_CSS.neutral || "#f472b6", cG = WYE_CSS.grid || "rgba(255,255,255,0.06)";

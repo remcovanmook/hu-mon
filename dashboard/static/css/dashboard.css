@@ -919,7 +919,7 @@ html, body {
 
   /* Wye diagram: stack canvas above stats table on small screens. */
   .wye-layout { flex-direction: column; }
-  .wye-diagram-wrap { min-height: 260px; }
+  .wye-diagram-wrap { min-height: 220px; }
   .wye-stats { flex-direction: row; flex-wrap: wrap; }
   .wye-stats-group { min-width: 240px; flex: 1; }
 }
@@ -1009,7 +1009,7 @@ html, body {
 /** Square canvas container; canvas fills it 1:1. */
 .wye-diagram-wrap {
   width: 380px;
-  height: 380px;
+  height: 330px;
   flex-shrink: 0;
   position: relative;
 }
