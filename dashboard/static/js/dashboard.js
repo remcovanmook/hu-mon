@@ -203,6 +203,12 @@ function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
     document.getElementById(`tab-btn-${id}`).classList.add('tab-btn--active');
     document.getElementById(`tab-${id}`).hidden = false;
+    // Wye canvases live in a hidden tab at init time; getBoundingClientRect()
+    // returns zero until the tab is first shown.  Resize both canvases here.
+    if (id === 'grid') {
+        resizeWyeCanvas();
+        resizeNeutralCanvas();
+    }
 }
 
 
