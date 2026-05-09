@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-from flask import Flask, Response, send_from_directory
+from flask import Flask, Response, render_template, send_from_directory
 from growatt.store import GrowattStore
 
 logger = logging.getLogger("growatt_dashboard")
@@ -117,7 +117,7 @@ def create_app(store: GrowattStore) -> Flask:
 
     @app.route('/')
     def index():
-        return app.send_static_file('dashboard.html')
+        return render_template('dashboard.html', logo_text='Growatt')
 
     @app.route('/stream')
     def stream():

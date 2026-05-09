@@ -1,71 +1,8 @@
 
 "use strict";
 
-// --- Added by Chart Refactor ---
-function niceScale(rawMin, rawMax, maxIntervals = 5) {
-  if (!Number.isFinite(rawMin) || !Number.isFinite(rawMax) || rawMin === rawMax) {
-    return { min: Math.floor(rawMin) - 1, max: Math.ceil(rawMax) + 1, step: 1 };
-  }
-  const range = rawMax - rawMin;
-  const roughStep = range / maxIntervals;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-  const norm = roughStep / magnitude;
-  let step;
-  if (norm <= 1) step = magnitude;
-  else if (norm <= 2) step = 2 * magnitude;
-  else if (norm <= 5) step = 5 * magnitude;
-  else step = 10 * magnitude;
-  return { min: Math.floor(rawMin / step) * step, max: Math.ceil(rawMax / step) * step, step };
-}
-
-function syncChartScales(chartArray, extremesArray, minFloor = -Infinity) {
-  let globalMin = Infinity, globalMax = -Infinity;
-  extremesArray.forEach(e => {
-    if (e.min < globalMin) globalMin = e.min;
-    if (e.max > globalMax) globalMax = e.max;
-  });
-  if (!Number.isFinite(globalMin) || !Number.isFinite(globalMax)) return;
-  const clampedMin = Math.max(minFloor, globalMin);
-  const { min, max, step } = niceScale(clampedMin, globalMax);
-  const niceMin = Math.max(minFloor, min);
-
-  chartArray.forEach(c => {
-    if(!c) return;
-    c.options.scales.y.min = niceMin;
-    c.options.scales.y.max = max;
-    if(!c.options.scales.y.ticks) c.options.scales.y.ticks = {};
-    c.options.scales.y.ticks.stepSize = step;
-  });
-}
-
-function buildStatusAnnotation(tsMs, statusStr) {
-  return {
-    type: "line", scaleID: "x", value: tsMs,
-    borderColor: "rgba(139, 92, 246, 0.5)", borderWidth: 1, borderDash: [4, 4],
-    label: {
-      display: true, content: statusStr, position: "center",
-      backgroundColor: "rgba(139, 92, 246, 0.8)", color: "#fff",
-      font: { size: 9, weight: "600" }, padding: { x: 4, y: 2 }, borderRadius: 4, rotation: -90
-    }
-  };
-}
-
-function updateSparklineAnnotations(chart, min, max, color) {
-  if(!chart) return;
-  const cStr = typeof color === 'string' && color.startsWith('#') ? color + '80' : color;
-  const bg = typeof color === 'string' && color.startsWith('#') ? color + 'd0' : 'rgba(100,100,100,0.8)';
-  if (!chart.options.plugins.annotation) chart.options.plugins.annotation = { annotations: {} };
-  const anns = chart.options.plugins.annotation.annotations;
-  
-  anns.minLine = {
-      type: 'line', yMin: min, yMax: min, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
-      label: { display: true, content: min.toFixed(1), position: 'end', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
-  };
-  anns.maxLine = {
-      type: 'line', yMin: max, yMax: max, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
-      label: { display: true, content: max.toFixed(1), position: 'start', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
-  };
-}
+/** @type {object} Current chart colour palette; refreshed on theme change. */
+let COLORS = chartPalette();
 
 const extremes = {
     pv_v: Array.from({length: 4}, () => ({min: Infinity, max: -Infinity})),
@@ -93,6 +30,25 @@ const STATUS_MAP = {
     8: "OFF-GRID",  // battery only, off-grid
     9: "BYPASS",
 };
+
+/**
+ * Map an inverter status string to a CSS modifier class for the header dot.
+ *
+ * Classes correspond to CSS rules on .status-dot:
+ *   inv-normal  bright green  — PV/battery actively on-grid
+ *   inv-bypass  dark green    — power flowing through bypass relay
+ *   inv-fault   red           — hardware or protection fault
+ *   inv-other   amber         — standby, self-test, upgrade, off-grid, unknown
+ *
+ * @param {string} str - A value from STATUS_MAP or "UNKNOWN".
+ * @returns {string} CSS class name.
+ */
+function inverterDotClass(str) {
+    if (str === "NORMAL")  return "inv-normal";
+    if (str === "BYPASS")  return "inv-bypass";
+    if (str === "FAULT")   return "inv-fault";
+    return "inv-other";
+}
 const FAULT_MAP = {
     101: "Communication fault (Internal)",
     116: "EEPROM fault",
@@ -116,105 +72,41 @@ const FAULT_MAP = {
     417: "EPS output voltage abnormal"
 };
 
-function chartPalette() {
-  const s = getComputedStyle(document.documentElement);
-  const v = name => s.getPropertyValue(name).trim();
-  return {
-    delivered: v("--delivered-color") || '#22c55e',
-    returned:  v("--returned-color") || '#f59e0b',
-    net:       v("--net-color") || '#3b82f6',
-    l1:        v("--phase-l1") || '#ef4444',
-    l2:        v("--phase-l2") || '#eab308',
-    l3:        v("--phase-l3") || '#3b82f6',
-    pv1: '#3b82f6', pv2: '#8b5cf6', pv3: '#ec4899', load: '#a855f7',
-    ll12: v('--wye-l12') || '#a78bfa',
-    ll13: v('--wye-l13') || '#34d399',
-    ll23: v('--wye-l23') || '#fbbf24',
-  };
-}
-let COLORS = chartPalette();
 
-/** @type {object} Cached CSS colour tokens for the wye canvas draw functions. */
-let WYE_CSS = {};
-
-const THEME_CYCLE  = ["light", "dark", "auto"];
-const THEME_LABELS = { light: "☀️ Light", dark: "🌙 Dark", auto: "◐ Auto" };
-
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem("hegg-theme", theme);
-  const btn = document.getElementById("theme-toggle");
-  if (btn) btn.textContent = THEME_LABELS[theme] ?? theme;
-  recolorCharts();
-}
-function cycleTheme() {
-  const current = document.documentElement.dataset.theme || "light";
-  const next    = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
-  applyTheme(next);
-}
 function recolorCharts() {
   COLORS = chartPalette();
-  const s = getComputedStyle(document.documentElement);
+  const s    = getComputedStyle(document.documentElement);
   const grid = s.getPropertyValue("--chart-grid").trim() || "rgba(0,0,0,0.06)";
   const tick = s.getPropertyValue("--text-muted").trim() || "#6b7490";
-  // Refresh the wye CSS token cache so canvas draws pick up the new theme.
-  WYE_CSS = {
-    cl1:     s.getPropertyValue("--phase-l1").trim(),
-    cl2:     s.getPropertyValue("--phase-l2").trim(),
-    cl3:     s.getPropertyValue("--phase-l3").trim(),
-    cl12:    s.getPropertyValue("--wye-l12").trim(),
-    cl13:    s.getPropertyValue("--wye-l13").trim(),
-    cl23:    s.getPropertyValue("--wye-l23").trim(),
-    neutral: s.getPropertyValue("--wye-neutral").trim(),
-    grid,
-    text:    tick,
-    dim:     s.getPropertyValue("--text-dim").trim(),
-  };
+  // Delegate wye colour token refresh to the wye module.
+  refreshWyeCSS();
   Chart.defaults.color = tick;
   Object.values(charts).forEach(chart => {
       Object.values(chart.options.scales).forEach(axis => {
           if (axis.ticks) axis.ticks.color = tick;
-          if (axis.grid) axis.grid.color = grid;
+          if (axis.grid)  axis.grid.color  = grid;
       });
       chart.update("none");
   });
 }
 
-function getBaseOpts() {
-    return {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        transitions: { active: { animation: { duration: 0 } } },
-        interaction: { mode: "index", intersect: false },
-        elements: { point: { radius: 0, hitRadius: 6 }, line: { tension: 0.3, borderWidth: 1.5 } },
-        scales: {
-            x: { type: "time", time: { tooltipFormat: "HH:mm:ss" }, ticks: { maxTicksLimit: 8 } },
-            y: {}
-        },
-        plugins: {
-            annotation: { annotations: {} },
-            legend: { display: true },
-            tooltip: { padding: 10 }
-        }
-    };
-}
-
-function switchTab(id) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-btn--active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
-    document.getElementById(`tab-btn-${id}`).classList.add('tab-btn--active');
-    document.getElementById(`tab-${id}`).hidden = false;
-    // Wye canvases live in a hidden tab at init time; getBoundingClientRect()
-    // returns zero until the tab is first shown.  Resize both canvases here.
-    if (id === 'grid') {
+/**
+ * Handle tab-switch side-effects that are growatt-specific:
+ *   - Persist the active tab to localStorage.
+ *   - Resize wye canvases when the grid tab becomes visible
+ *     (getBoundingClientRect returns zero in hidden tabs).
+ */
+document.addEventListener("dashboard:tabswitch", ({ detail }) => {
+    localStorage.setItem("growatt-tab", detail.id);
+    if (detail.id === "grid") {
         resizeWyeCanvas();
         resizeNeutralCanvas();
     }
-}
+});
 
 
 
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const toggleBtn = document.getElementById("theme-toggle");
     if (toggleBtn) {
         toggleBtn.addEventListener("click", cycleTheme);
@@ -229,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     recolorCharts();   // populate WYE_CSS before first draw
     initWyeDiagram();
+    initFlowScale();
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {
@@ -249,8 +142,9 @@ document.addEventListener("DOMContentLoaded", () => {
             extremes.eps_c[i] = {min: Infinity, max: -Infinity}; }
         statusAnnotations = {};
         lastStatus = null;
-        
+
         currentHours = hours;
+        localStorage.setItem('growatt-range', hours);
         loadHistory(hours);
     });
     
@@ -300,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('pv-a-cards', 'Current', 'A', 3, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
-    createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['RS', 'ST', 'TR']);
+    createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['L1\u2013L2', 'L2\u2013L3', 'L1\u2013L3']);
     createGroup('eps-v-cards', 'Voltage', 'V', 3, 'eps');
     createGroup('eps-a-cards', 'Current', 'A', 3, 'eps');
 
@@ -346,6 +240,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     charts.freq = createChart('chart-freq', [{ label: 'Grid Freq', color: COLORS.pv1 }], false);
+    // Fixed Y range: nominal 50 Hz ± 0.25 Hz (EN 50160 nominal tolerance).
+    charts.freq.options.scales.y.min = 49.75;
+    charts.freq.options.scales.y.max = 50.25;
+    charts.freq.options.scales.y.ticks = {
+        callback: (v) => v.toFixed(2),
+        maxTicksLimit: 6,
+    };
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
@@ -356,72 +257,32 @@ document.addEventListener("DOMContentLoaded", () => {
     tickClock();
     setInterval(tickClock, 1000);
 
-    loadHistory(currentHours);
+    // Restore history range from localStorage; fall back to the select's
+    // default value (24 h) if nothing has been saved yet.
+    const rangeEl = document.getElementById("history-range");
+    const savedRange = localStorage.getItem('growatt-range');
+    if (savedRange && rangeEl) {
+        rangeEl.value = savedRange;   // update the <select> display
+        currentHours = Number.parseInt(savedRange, 10);
+    }
+
+    // Restore the last active tab; fall back to 'overview'.
+    const savedTab = localStorage.getItem('growatt-tab') || 'overview';
+    switchTab(savedTab);
+
+    // Await history so lastStatus is correctly seeded before SSE connects.
+    // Connecting SSE before history loads risks lastStatus being set by the
+    // first live reading, causing the first real status-change to be missed.
+    await loadHistory(currentHours);
     connectSSE();
     recolorCharts();
 });
 
+// currentHours is initialised from localStorage in DOMContentLoaded;
+// the literal 24 here acts as a safe default before that runs.
 let currentHours = 24;
 
-function createChart(id, series, showLegend = true) {
-    const el = document.getElementById(id);
-    if(!el) return null;
-    const ctx = el.getContext('2d');
-    
-    const datasets = series.map(s => {
-        return {
-            label: s.label, 
-            borderColor: s.color, 
-            backgroundColor: s.color,
-            data: [], 
-            fill: false, 
-            tension: 0.1, 
-            pointRadius: 0,
-            borderWidth: 2,
-            borderCapStyle: 'round'
-        };
-    });
 
-    const opts = {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: {
-            annotation: { annotations: {} },
-            legend: { 
-                display: showLegend, 
-                position: 'bottom',
-                labels: { usePointStyle: true, boxWidth: 8, padding: 20 }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                titleFont: { size: 13, family: 'JetBrains Mono' },
-                bodyFont: { size: 13, family: 'JetBrains Mono' },
-                padding: 12,
-                cornerRadius: 8,
-                displayColors: true
-            }
-        },
-        scales: {
-            x: { 
-                type: "time", 
-                time: { tooltipFormat: "HH:mm" }, 
-                grid: { display: true, color: "rgba(100, 100, 100, 0.1)" },
-                ticks: { maxTicksLimit: 6, display: showLegend },
-                border: { display: showLegend }
-            },
-            y: { 
-                grid: { color: "rgba(100, 100, 100, 0.1)", borderDash: [5, 5] }
-            }
-        }
-    };
-
-    return new Chart(ctx, { type: 'line', data: { labels: [], datasets: datasets }, options: opts });
-}
-
-function updateDOM(id, val) {
-    const el = document.getElementById(id);
-    if(el && el.innerText !== String(val)) el.innerText = val;
-}
 
 async function loadHistory(hours = 24) {
     try {
@@ -537,23 +398,28 @@ async function loadHistory(hours = 24) {
     }
 }
 
-function pushChart(chart, ts, values) {
-    if(!chart) return;
-    chart.data.labels.push(ts);
-    for(let i=0; i<values.length; i++) chart.data.datasets[i].data.push(values[i]);
-    chart.update('none');
-}
 
 function connectSSE() {
     const es = new EventSource("/stream");
     es.addEventListener("reading", (e) => {
         const d = JSON.parse(e.data);
         const ts = d.ts;
-        
-        
+
+        // ── Status indicator ─────────────────────────────────────────────────
+        // Update unconditionally and first, before any chart rendering that
+        // could throw and prevent this from running.
+        const _statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
+        const _sl  = document.getElementById("status-label");
+        const _dot = document.getElementById("status-dot");
+        if (_sl)  _sl.innerText = _statusStr;
+        if (_dot) {
+            _dot.classList.remove("inv-normal", "inv-bypass", "inv-fault", "inv-other");
+            _dot.classList.add(inverterDotClass(_statusStr));
+        }
+
         updateDOM("sum-pv", d.pv_total_w.toFixed(0));
         updateDOM("sum-pv-val", d.pv_total_w.toFixed(0)); // Header of PV tab
-        updateDOM("sum-pv-stat", STATUS_MAP[d.status_code] || "UNKNOWN");
+        updateDOM("sum-pv-stat", _statusStr);
         updateDOM("sum-pv-today", d.pv_today_kwh.toFixed(1));
         updateDOM("sum-pv-total", d.pv_total_kwh.toFixed(0));
 
@@ -612,6 +478,9 @@ function connectSSE() {
                 if(chart) {
                     chart.options.scales.x.min = flooredMin;
                     chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations, ...statusAnnotations };
+                    // Render immediately so the marker is visible before the
+                    // bulk chart.update() at the end of the SSE handler.
+                    chart.update("none");
                 }
             });
         } else {
@@ -691,10 +560,11 @@ function connectSSE() {
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
         
-        Object.values(charts).forEach(c => { if(c) c.update('none'); });
-        
-        const sl = document.getElementById("status-label");
-        if(sl) sl.innerText = statusStr;
+        try {
+            Object.values(charts).forEach(c => { if(c) c.update('none'); });
+        } catch (err) {
+            console.warn("chart.update error:", err);
+        }
 
         // --- Cute Flow Diagram Animation ---
         updateDOM("flow-pv", d.pv_total_w.toFixed(0) + " W");
@@ -801,260 +671,3 @@ function connectSSE() {
     });
 }
 
-/* ── 3-phase Wye phasor diagram ──────────────────────────────────────────── */
-
-/**
- * Compute the magnitude of the line-to-line voltage between two phases,
- * assuming a 120° separation in the ideal wye arrangement.
- *
- * Cosine rule: |Va − Vb|² = Va² + Vb² − 2·Va·Vb·cos(120°)
- *                         = Va² + Vb² + Va·Vb   (cos 120° = −0.5)
- *
- * @param {number} va - Phase-to-neutral magnitude of the first phase (V).
- * @param {number} vb - Phase-to-neutral magnitude of the second phase (V).
- * @returns {number} Line voltage magnitude in volts.
- */
-function lineVoltage(va, vb) {
-  return Math.sqrt(va * va + vb * vb + va * vb);
-}
-
-/**
- * Compute the complex neutral shift relative to the system ground.
- *
- * In a balanced wye the neutral is the centroid of the three phasor tips
- * and the result is zero.
- * Angles: L1 = 0°, L2 = −120°, L3 = +120°.
- *
- * @param {number} v1 - L1 magnitude (V).
- * @param {number} v2 - L2 magnitude (V).
- * @param {number} v3 - L3 magnitude (V).
- * @returns {{ re: number, im: number }}
- */
-function neutralShift(v1, v2, v3) {
-  const d120 = (2 * Math.PI) / 3;
-  return {
-    re: (v1 + v2 * Math.cos(-d120) + v3 * Math.cos(d120)) / 3,
-    im: (v2 * Math.sin(-d120) + v3 * Math.sin(d120)) / 3,
-  };
-}
-
-/**
- * Compute per-phase voltage imbalance (NEMA definition).
- * Returns 100 × maxDeviation / mean.
- *
- * @param {number} v1
- * @param {number} v2
- * @param {number} v3
- * @returns {number} Imbalance factor (%).
- */
-function voltageImbalance(v1, v2, v3) {
-  const mean = (v1 + v2 + v3) / 3;
-  if (mean === 0) return 0;
-  return (Math.max(Math.abs(v1 - mean), Math.abs(v2 - mean), Math.abs(v3 - mean)) / mean) * 100;
-}
-
-/** @type {HTMLCanvasElement|null} */
-let wyeCanvas = null;
-/** @type {CanvasRenderingContext2D|null} */
-let wyeCtx = null;
-/** @type {HTMLCanvasElement|null} */
-let neutralCanvas = null;
-/** @type {CanvasRenderingContext2D|null} */
-let neutralCtx = null;
-
-/**
- * Initialise the wye canvas elements and attach resize listeners.
- * Called once from DOMContentLoaded after recolorCharts() has populated WYE_CSS.
- */
-function initWyeDiagram() {
-  wyeCanvas = document.getElementById("wye-canvas");
-  if (!wyeCanvas) return;
-  wyeCtx = wyeCanvas.getContext("2d");
-  resizeWyeCanvas();
-  window.addEventListener("resize", resizeWyeCanvas);
-
-  neutralCanvas = document.getElementById("wye-neutral-canvas");
-  if (neutralCanvas) {
-    neutralCtx = neutralCanvas.getContext("2d");
-    resizeNeutralCanvas();
-    window.addEventListener("resize", resizeNeutralCanvas);
-  }
-}
-
-/** Resize the main wye canvas pixel buffer to match CSS layout size. */
-function resizeWyeCanvas() {
-  if (!wyeCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const rect = wyeCanvas.getBoundingClientRect();
-  wyeCanvas.width  = rect.width  * dpr;
-  wyeCanvas.height = rect.height * dpr;
-  wyeCtx.scale(dpr, dpr);
-}
-
-/** Resize the mini neutral-offset canvas pixel buffer. */
-function resizeNeutralCanvas() {
-  if (!neutralCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const rect = neutralCanvas.getBoundingClientRect();
-  neutralCanvas.width  = rect.width  * dpr;
-  neutralCanvas.height = rect.height * dpr;
-  neutralCtx.scale(dpr, dpr);
-}
-
-/**
- * Draw the complete 3-phase wye phasor diagram.
- *
- * A 200 V display base is subtracted from each vector magnitude so inter-phase
- * deviations are visible at normal EU voltages (~230 V). IEC EN 50160
- * tolerance bands are drawn at 207 / 230 / 253 V relative to the same base.
- *
- * Chord labels use the directly measured line-to-line voltages (ll12, ll13,
- * ll23) rather than values computed from V_LN so they match the L-L cards.
- *
- * @param {number} v1   - L1 phase-to-neutral RMS voltage (V).
- * @param {number} v2   - L2 phase-to-neutral RMS voltage (V).
- * @param {number} v3   - L3 phase-to-neutral RMS voltage (V).
- * @param {number} ll12 - Measured V_RS (L1–L2) line voltage (V).
- * @param {number} ll13 - Measured V_TR (L1–L3) line voltage (V).
- * @param {number} ll23 - Measured V_ST (L2–L3) line voltage (V).
- */
-function drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23) {
-  if (!wyeCtx || !wyeCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = wyeCanvas.width / dpr, H = wyeCanvas.height / dpr;
-  const cx = W / 2, cy = H / 2;
-  const BASE = 200, CEIL = 65;
-  const dv1 = Math.max(v1 - BASE, 1), dv2 = Math.max(v2 - BASE, 1), dv3 = Math.max(v3 - BASE, 1);
-  const scale = (Math.min(W, H) * 0.38) / CEIL;
-  const cl1 = WYE_CSS.cl1 || "#60a5fa", cl2 = WYE_CSS.cl2 || "#34d399", cl3 = WYE_CSS.cl3 || "#f59e0b";
-  const cl12 = WYE_CSS.cl12 || "#818cf8", cl13 = WYE_CSS.cl13 || "#fb7185", cl23 = WYE_CSS.cl23 || "#a78bfa";
-  const cN = WYE_CSS.neutral || "#f472b6", cG = WYE_CSS.grid || "rgba(255,255,255,0.06)";
-  const cT = WYE_CSS.text || "#9ca3af", cD = WYE_CSS.dim || "#4b5563";
-  const ctx = wyeCtx;
-  ctx.clearRect(0, 0, W, H);
-  const toXY = (m, deg) => { const r = deg * Math.PI / 180; return { x: cx + m * scale * Math.cos(r), y: cy - m * scale * Math.sin(r) }; };
-  const p1 = toXY(dv1, 90), p2 = toXY(dv2, -30), p3 = toXY(dv3, 210);
-  const meanR = (dv1 + dv2 + dv3) / 3 * scale;
-  for (let f = 0.25; f <= 1.01; f += 0.25) { ctx.beginPath(); ctx.arc(cx, cy, meanR * f, 0, 2 * Math.PI); ctx.strokeStyle = cG; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.stroke(); }
-  for (let a = 0; a < 360; a += 60) { const sp = toXY(CEIL, a); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sp.x, sp.y); ctx.strokeStyle = cG; ctx.lineWidth = 0.5; ctx.stroke(); }
-  const iecRing = (dV, col, dash, lbl, ang) => { const r = dV * scale; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]); ctx.font = "9px 'JetBrains Mono', monospace"; ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(lbl, cx + (r + 5) * Math.cos(ang), cy - (r + 5) * Math.sin(ang)); };
-  iecRing(7,  "rgba(251,146,60,0.55)",  [3, 3], "207 V", Math.PI * 0.25);
-  iecRing(53, "rgba(251,146,60,0.55)",  [3, 3], "253 V", Math.PI * 0.25);
-  iecRing(30, "rgba(255,255,255,0.30)", [5, 3], "230 V", Math.PI * 0.2);
-  ctx.beginPath(); ctx.arc(cx, cy, meanR, 0, 2 * Math.PI); ctx.strokeStyle = cD; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
-  const chord = (pa, pb, col, lbl, ox, oy) => { ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([6, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.font = "bold 9px 'JetBrains Mono', monospace"; ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(lbl, (pa.x + pb.x) / 2 + ox, (pa.y + pb.y) / 2 + oy); };
-  // Chord labels use measured V_LL values for accuracy; the geometric chord
-  // position is still derived from V_LN phasor tips.
-  chord(p1, p2, cl12, "L1\u2013L2 " + (ll12 || lineVoltage(v1, v2)).toFixed(1) + " V",  14, -6);
-  chord(p1, p3, cl13, "L1\u2013L3 " + (ll13 || lineVoltage(v1, v3)).toFixed(1) + " V", -14, -6);
-  chord(p2, p3, cl23, "L2\u2013L3 " + (ll23 || lineVoltage(v2, v3)).toFixed(1) + " V",   0, 14);
-  const vec = (p, col, lbl, mag) => { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke(); const a = Math.atan2(cy - p.y, p.x - cx), hs = 8; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - hs * Math.cos(a - 0.35), p.y + hs * Math.sin(a - 0.35)); ctx.lineTo(p.x - hs * Math.cos(a + 0.35), p.y + hs * Math.sin(a + 0.35)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill(); ctx.font = "bold 11px 'Inter', sans-serif"; ctx.fillStyle = col; ctx.textAlign = "center"; ctx.fillText(lbl + " " + mag.toFixed(1) + " V", p.x + (p.x - cx) * 0.18, p.y + (p.y - cy) * 0.18); };
-  vec(p1, cl1, "L1", v1); vec(p2, cl2, "L2", v2); vec(p3, cl3, "L3", v3);
-  const ns = neutralShift(v1, v2, v3), npx = cx + ns.re * scale, npy = cy - ns.im * scale;
-  if (Math.hypot(npx - cx, npy - cy) > 0.5) { ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(npx, npy); ctx.strokeStyle = cN; ctx.lineWidth = 2; ctx.setLineDash([3, 2]); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(npx, npy, 5, 0, 2 * Math.PI); ctx.fillStyle = cN; ctx.fill(); }
-  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 2 * Math.PI); ctx.fillStyle = cT; ctx.fill();
-  ctx.font = "10px 'JetBrains Mono', monospace"; ctx.fillStyle = cT; ctx.textAlign = "center";
-  ctx.fillText("mean " + ((v1 + v2 + v3) / 3).toFixed(1) + " V", cx, cy - 10);
-  ctx.font = "8px 'JetBrains Mono', monospace"; ctx.fillStyle = cD; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-  ctx.fillText("\u2212" + BASE + " V base", 6, H - 4); ctx.textBaseline = "alphabetic";
-}
-
-/**
- * Update all wye DOM stat elements and redraw both canvases.
- *
- * v1/v2/v3 are V_LN values from the driver (grid_l1/2/3_v).
- * ll12/ll13/ll23 are directly measured V_LL from the Growatt meter registers
- * (31106-31108, R=L1, S=L2, T=L3): RS=L1-L2, ST=L2-L3, TR=L1-L3.
- * Using measured LL values avoids round-trip error from V_LN derivation.
- *
- * @param {number} v1   - L1 phase-to-neutral RMS (V).
- * @param {number} v2   - L2 phase-to-neutral RMS (V).
- * @param {number} v3   - L3 phase-to-neutral RMS (V).
- * @param {number} llRS - Measured V_RS = L1–L2 line voltage (V).
- * @param {number} llST - Measured V_ST = L2–L3 line voltage (V).
- * @param {number} llTR - Measured V_TR = L1–L3 line voltage (V).
- */
-function updateWyeDiagram(v1, v2, v3, llRS, llST, llTR) {
-  if (!v1 || !v2 || !v3) return;
-  const IEC_NOM = 230, IEC_LL = 400;
-  const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-  set("wye-v-l1", v1.toFixed(1)); set("wye-v-l2", v2.toFixed(1)); set("wye-v-l3", v3.toFixed(1));
-  const setIdeal = (id, v, nom) => {
-    const e = document.getElementById(id); if (!e) return;
-    const d = v - nom, p = (d / nom) * 100;
-    e.textContent = (d >= 0 ? "+" : "") + d.toFixed(1) + " V vs IEC (" + (p >= 0 ? "+" : "") + p.toFixed(1) + "%)";
-    e.className = "wt-ideal " + (d >= 0 ? "wt-ideal--pos" : "wt-ideal--neg");
-  };
-  setIdeal("wye-ideal-l1", v1, IEC_NOM); setIdeal("wye-ideal-l2", v2, IEC_NOM); setIdeal("wye-ideal-l3", v3, IEC_NOM);
-  // Use measured V_LL directly; RS=L1-L2, ST=L2-L3, TR=L1-L3.
-  const ll12 = llRS || lineVoltage(v1, v2);
-  const ll23 = llST || lineVoltage(v2, v3);
-  const ll13 = llTR || lineVoltage(v1, v3);
-  set("wye-diff-l12", ll12.toFixed(1)); set("wye-diff-l13", ll13.toFixed(1)); set("wye-diff-l23", ll23.toFixed(1));
-  setIdeal("wye-ideal-l12", ll12, IEC_LL); setIdeal("wye-ideal-l13", ll13, IEC_LL); setIdeal("wye-ideal-l23", ll23, IEC_LL);
-  const ns = neutralShift(v1, v2, v3), nMag = Math.hypot(ns.re, ns.im);
-  set("wye-neutral-mag", nMag.toFixed(2));
-  set("wye-neutral-ang", (Math.atan2(ns.im, ns.re) * 180 / Math.PI).toFixed(1));
-  set("wye-imbalance",   voltageImbalance(v1, v2, v3).toFixed(2));
-  drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23);
-  drawNeutralMini(ns.re, ns.im, nMag);
-}
-
-/**
- * Draw the mini neutral-offset polar diagram.
- *
- * The outer ring auto-scales to the smallest 5 V multiple >= 2 * magnitude
- * (floor 5 V). Phase direction labels placed just outside the ring.
- *
- * @param {number} re  - Real part of neutral shift (V).
- * @param {number} im  - Imaginary part of neutral shift (V).
- * @param {number} mag - Magnitude of neutral shift (V).
- */
-function drawNeutralMini(re, im, mag) {
-  if (!neutralCtx || !neutralCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = neutralCanvas.width / dpr, H = neutralCanvas.height / dpr;
-  const cx = W / 2, cy = H / 2;
-  const cN = WYE_CSS.neutral || "#f472b6", cG = WYE_CSS.grid || "rgba(255,255,255,0.06)";
-  const cT = WYE_CSS.text || "#9ca3af", cD = WYE_CSS.dim || "#4b5563";
-  const cl1 = WYE_CSS.cl1 || "#60a5fa", cl2 = WYE_CSS.cl2 || "#34d399", cl3 = WYE_CSS.cl3 || "#f59e0b";
-  const ctx = neutralCtx;
-  ctx.clearRect(0, 0, W, H);
-  const maxRef = Math.max(5, Math.ceil(Math.max(mag * 2, 1) / 5) * 5);
-  const R = Math.min(W, H) * 0.36, scale = R / maxRef;
-  [0.25, 0.5, 0.75, 1].forEach(f => { ctx.beginPath(); ctx.arc(cx, cy, R * f, 0, 2 * Math.PI); ctx.strokeStyle = cG; ctx.lineWidth = f === 1 ? 1 : 0.75; ctx.setLineDash([]); ctx.stroke(); });
-  for (let a = 0; a < 360; a += 30) { const r = a * Math.PI / 180; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.cos(r), cy - R * Math.sin(r)); ctx.strokeStyle = cG; ctx.lineWidth = 0.5; ctx.stroke(); }
-  ctx.font = "8px 'JetBrains Mono', monospace"; ctx.fillStyle = cD; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-  ctx.fillText(maxRef + " V", cx + R * Math.cos(Math.PI / 4) + 3, cy - R * Math.sin(Math.PI / 4)); ctx.textBaseline = "alphabetic";
-  [{ l: "L1", a: 90, c: cl1 }, { l: "L2", a: -30, c: cl2 }, { l: "L3", a: 210, c: cl3 }].forEach(({ l, a, c }) => {
-    const r = a * Math.PI / 180; ctx.font = "bold 8px 'Inter', sans-serif"; ctx.fillStyle = c; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(l, cx + (R + 11) * Math.cos(r), cy - (R + 11) * Math.sin(r));
-  }); ctx.textBaseline = "alphabetic";
-  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 2 * Math.PI); ctx.fillStyle = cT; ctx.fill();
-  const vx = cx + re * scale, vy = cy - im * scale;
-  if (Math.hypot(vx - cx, vy - cy) > 1.5) {
-    // Shaft: offset point → origin (arrowhead points at the balanced centre).
-    ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(cx, cy);
-    ctx.strokeStyle = cN; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
-
-    // Arrowhead at (cx, cy) — angle from offset point toward centre.
-    const a2 = Math.atan2(cy - vy, cx - vx), hs = 6;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx - hs * Math.cos(a2 - 0.4), cy - hs * Math.sin(a2 - 0.4));
-    ctx.lineTo(cx - hs * Math.cos(a2 + 0.4), cy - hs * Math.sin(a2 + 0.4));
-    ctx.closePath(); ctx.fillStyle = cN; ctx.fill();
-
-    // Red dot at the offset point — "you are here".
-    ctx.beginPath(); ctx.arc(vx, vy, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = "#ef4444"; ctx.fill();
-
-    // Magnitude label nudged outward from the offset point (away from centre).
-    const lx = vx + (vx - cx) * 0.35, ly = vy + (vy - cy) * 0.35;
-    ctx.font = "bold 9px 'JetBrains Mono', monospace"; ctx.fillStyle = cN;
-    ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-    ctx.fillText(mag.toFixed(2) + " V", lx, ly - 4); ctx.textBaseline = "alphabetic";
-  } else {
-    ctx.font = "9px 'JetBrains Mono', monospace"; ctx.fillStyle = cT; ctx.textAlign = "center"; ctx.fillText("balanced", cx, cy + 18);
-  }
-}
