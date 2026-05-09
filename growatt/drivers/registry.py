@@ -283,7 +283,8 @@ def auto_select(
         for driver_cls in DRIVER_REGISTRY:
             instance = driver_cls()
             if instance.driver_id == force_driver_id:
-                logger.info("Forced driver: %s", force_driver_id)
+                logger.info("Reusing pre-selected driver: %s", force_driver_id)
+
                 return instance, slave_id, ctx
         raise ValueError(
             f"Driver '{force_driver_id}' not found in registry. "
