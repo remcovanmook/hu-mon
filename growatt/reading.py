@@ -31,6 +31,10 @@ class GrowattReading:
     grid_l2_a: float = 0.0
     grid_l3_v: float = 0.0
     grid_l3_a: float = 0.0
+    # Line-to-line voltages (VPP registers 31106/31107/31108)
+    grid_ll_rs_v: float = 0.0   # RS (L1-L2)
+    grid_ll_st_v: float = 0.0   # ST (L2-L3)
+    grid_ll_tr_v: float = 0.0   # TR (L3-L1)
     grid_freq: float = 0.0
     meter_total_w: float = 0.0  # pos: export, neg: import
     meter_l1_w: float = 0.0
@@ -60,6 +64,8 @@ class GrowattReading:
     load_today_kwh: float = 0.0
     bat_charge_today_kwh: float = 0.0
     bat_discharge_today_kwh: float = 0.0
+    bat_charge_total_kwh: float = 0.0
+    bat_discharge_total_kwh: float = 0.0
 
     # Metadata
     inverter_model: str = ""

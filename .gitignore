@@ -5,3 +5,5 @@ hegg-emon/
 *.db-wal
 __pycache__/
 db/*
+Growatt_ModbusTCP/
+.DS_Store

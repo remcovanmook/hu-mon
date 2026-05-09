@@ -3,7 +3,9 @@ import logging
 import threading
 import time
 
+from growatt.drivers.registry import auto_select
 from growatt.store import GrowattStore
+from pymodbus.client import ModbusTcpClient
 from growatt_collector import poll_datalogger
 from growatt_modbus_server import run as run_modbus_server
 from dashboard.app import create_app
@@ -27,6 +29,8 @@ def main():
     parser.add_argument("--mqtt-port", type=int, default=1883)
     parser.add_argument("--mqtt-user", default="")
     parser.add_argument("--mqtt-pass", default="")
+    parser.add_argument("--mqtt-topic-prefix", default="",
+                        help="MQTT topic prefix (default: growatt/<serial>/)")
     
     # InfluxDB Options
     parser.add_argument("--influx-url", default="")
@@ -34,15 +38,33 @@ def main():
     parser.add_argument("--influx-org", default="")
     parser.add_argument("--influx-bucket", default="")
     parser.add_argument("--influx-db", default="growatt")
-    
+
+    # Driver override (optional — auto-detected by default)
+    parser.add_argument(
+        "--driver",
+        default=None,
+        metavar="DRIVER_ID",
+        help="Force a specific driver ID (e.g. growatt_mod_hu). Default: auto-detect.",
+    )
+
     args = parser.parse_args()
 
     store = GrowattStore(args.db)
+
+    # Run the probe pipeline once to select the driver and get the proxy config.
+    # The collector will re-use the same driver internally (sticky session).
+    probe_client = ModbusTcpClient(args.device_ip, port=args.datalogger_port)
+    probe_client.connect()
+    driver, slave_id, ctx = auto_select(probe_client, force_driver_id=args.driver)
+    proxy_cfg = driver.proxy_config(slave_id, ctx)
+    probe_client.close()
+    logger.info("Driver: %s  Proxy address_map: %s", driver.driver_id, proxy_cfg.address_map)
 
     # 1. Start Collector thread
     threading.Thread(
         target=poll_datalogger,
         args=(args.device_ip, args.datalogger_port, store),
+        kwargs={"driver_id": driver.driver_id},
         daemon=True,
         name="growatt-collector"
     ).start()
@@ -51,18 +73,19 @@ def main():
     # 2. Start Modbus proxy server thread
     threading.Thread(
         target=run_modbus_server,
-        args=(store, args.proxy_port),
+        args=(store, proxy_cfg, args.proxy_port),
         daemon=True,
         name="growatt-proxy"
     ).start()
-    logger.info("Modbus proxy server started on port %d", args.proxy_port)
+    logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, slave_id)
 
     # 3. Start MQTT Exporter (Optional)
     if args.mqtt_host:
         from growatt.mqtt_publisher import run as run_mqtt
         threading.Thread(
             target=run_mqtt,
-            args=(store, args.mqtt_host, args.mqtt_port, args.mqtt_user, args.mqtt_pass),
+            args=(store, args.mqtt_host, args.mqtt_port, args.mqtt_user, args.mqtt_pass,
+                  args.mqtt_topic_prefix),
             daemon=True,
             name="growatt-mqtt"
         ).start()
