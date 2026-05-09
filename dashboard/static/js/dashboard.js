@@ -258,6 +258,34 @@ function switchTab(id) {
 
 
 
+/**
+ * Scale the live energy flow diagram to fit its container.
+ *
+ * The SVG paths and node positions use a fixed 800×300 px coordinate space.
+ * A ResizeObserver watches the .flow-scale-wrap container and applies a
+ * CSS transform: scale() to .flow-container whenever the available width is
+ * smaller than 800 px.  The --flow-scale custom property is also set on the
+ * wrapper so that the CSS calc() height tracks the scaled diagram correctly.
+ */
+function initFlowScale() {
+    const wrap = document.querySelector('.flow-scale-wrap');
+    const container = document.querySelector('.flow-container');
+    if (!wrap || !container) return;
+
+    const DESIGN_W = 800;  // coordinate space width of the diagram
+
+    function applyScale() {
+        const available = wrap.getBoundingClientRect().width || wrap.offsetWidth;
+        const scale = Math.min(1, available / DESIGN_W);
+        container.style.transform = scale < 1 ? `scale(${scale})` : '';
+        wrap.style.setProperty('--flow-scale', scale);
+    }
+
+    const ro = new ResizeObserver(applyScale);
+    ro.observe(wrap);
+    applyScale();  // run once immediately
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const toggleBtn = document.getElementById("theme-toggle");
     if (toggleBtn) {
@@ -273,6 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     recolorCharts();   // populate WYE_CSS before first draw
     initWyeDiagram();
+    initFlowScale();
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {

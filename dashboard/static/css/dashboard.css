@@ -898,10 +898,10 @@ html, body {
   /* Main layout tightening. */
   .main { padding: 16px 16px 48px; gap: 20px; }
 
-  /* Cards: two columns on mid-size mobile, one below 480. */
-  .cards-row       { grid-template-columns: 1fr 1fr; }
-  .cards-row--four { grid-template-columns: 1fr 1fr; }
-  .cards-row--three { grid-template-columns: 1fr 1fr; }
+  /* Cards: single column on mobile — sparklines stack vertically. */
+  .cards-row,
+  .cards-row--three,
+  .cards-row--four  { grid-template-columns: 1fr; }
 
   .card-value { font-size: 2rem; }
   .logo-sub   { display: none; }
@@ -913,12 +913,8 @@ html, body {
   .wye-stats-group { min-width: 240px; flex: 1; }
 }
 
-/* Mobile portrait (≤ 480 px) */
+/* Mobile portrait (≤ 480 px): summary to single column (already single-col cards). */
 @media (max-width: 480px) {
-  .cards-row,
-  .cards-row--three,
-  .cards-row--four  { grid-template-columns: 1fr; }
-
   /* Summary strip: single column. */
   .summary-strip { grid-template-columns: 1fr; }
   .summary-item { border-right: none; }
@@ -1259,7 +1255,20 @@ html, body {
   padding: 2rem; margin-bottom: 2rem; position: relative;
 }
 .flow-container {
-  position: relative; height: 300px; width: 100%; max-width: 800px; margin: 0 auto;
+  position: relative; height: 300px; width: 800px;  /* fixed 800px coordinate space */
+  transform-origin: top left;
+  will-change: transform;
+}
+
+/*
+ * .flow-scale-wrap clips the scaled .flow-container and provides the
+ * correct layout height after transform. Height is set by JS via the
+ * --flow-scale custom property.
+ */
+.flow-scale-wrap {
+  overflow: hidden;
+  width: 100%;
+  height: calc(300px * var(--flow-scale, 1));
 }
 .flow-node {
   position: absolute; display: flex; flex-direction: column; align-items: center;

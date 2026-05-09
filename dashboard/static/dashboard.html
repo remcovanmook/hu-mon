@@ -191,7 +191,8 @@
         <article class="card card--diagram" style="padding: 2rem; border-radius: 12px;">
           <div class="card-label" style="margin-bottom: 1rem; font-weight: 600;">Live Energy Flow</div>
           <div class="power-flow" style="background:transparent; border:none; padding:0; margin:0;">
-            <div class="flow-container">
+            <div class="flow-scale-wrap">
+              <div class="flow-container">
               <div class="flow-node" id="node-pv">
                 <span class="icon">☀️</span><span class="label">PV Array</span><span class="val" id="flow-pv">0 W</span>
               </div>
@@ -213,7 +214,8 @@
                 <path d="M 400 120 L 400 230 L 280 230" class="flow-line" id="line-inv-bat" />
                 <path d="M 400 120 L 400 230 L 520 230" class="flow-line" id="line-inv-load" />
               </svg>
-            </div>
+              </div><!-- /.flow-container -->
+            </div><!-- /.flow-scale-wrap -->
           </div>
         </article>
         
