@@ -43,7 +43,7 @@ function buildStatusAnnotation(tsMs, statusStr) {
     type: "line", scaleID: "x", value: tsMs,
     borderColor: "rgba(139, 92, 246, 0.5)", borderWidth: 1, borderDash: [4, 4],
     label: {
-      display: true, content: statusStr, position: "center",
+      display: true, content: statusStr, position: "start",  // top of vertical line
       backgroundColor: "rgba(139, 92, 246, 0.8)", color: "#fff",
       font: { size: 9, weight: "600" }, padding: { x: 4, y: 2 }, borderRadius: 4, rotation: -90
     }
@@ -56,14 +56,14 @@ function updateSparklineAnnotations(chart, min, max, color) {
   const bg = typeof color === 'string' && color.startsWith('#') ? color + 'd0' : 'rgba(100,100,100,0.8)';
   if (!chart.options.plugins.annotation) chart.options.plugins.annotation = { annotations: {} };
   const anns = chart.options.plugins.annotation.annotations;
-  
+
   anns.minLine = {
       type: 'line', yMin: min, yMax: min, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
-      label: { display: true, content: min.toFixed(1), position: 'end', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
+      label: { display: true, content: min.toFixed(1), position: 'center', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
   };
   anns.maxLine = {
       type: 'line', yMin: max, yMax: max, borderColor: cStr, borderWidth: 1, borderDash: [2, 2],
-      label: { display: true, content: max.toFixed(1), position: 'start', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
+      label: { display: true, content: max.toFixed(1), position: 'center', backgroundColor: bg, color: '#fff', font: {size: 9, weight: '600'}, padding: {x: 4, y: 2}, borderRadius: 4 }
   };
 }
 
