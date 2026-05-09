@@ -300,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
     createGroup('pv-a-cards', 'Current', 'A', 3, 'PV');
     createGroup('grid-v-cards', 'Voltage', 'V', 3, 'L');
     createGroup('grid-a-cards', 'Current', 'A', 3, 'L');
-    createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['RS', 'ST', 'TR']);
+    createGroup('grid-ll-cards', 'Voltage', 'V', 3, 'LL', ['L1\u2013L2', 'L2\u2013L3', 'L1\u2013L3']);
     createGroup('eps-v-cards', 'Voltage', 'V', 3, 'eps');
     createGroup('eps-a-cards', 'Current', 'A', 3, 'eps');
 
