@@ -994,7 +994,11 @@ function updateWyeDiagram(v1, v2, v3, llRS, llST, llTR) {
   setIdeal("wye-ideal-l12", ll12, IEC_LL); setIdeal("wye-ideal-l13", ll13, IEC_LL); setIdeal("wye-ideal-l23", ll23, IEC_LL);
   const ns = neutralShift(v1, v2, v3), nMag = Math.hypot(ns.re, ns.im);
   set("wye-neutral-mag", nMag.toFixed(2));
-  set("wye-neutral-ang", (Math.atan2(ns.im, ns.re) * 180 / Math.PI).toFixed(1));
+  // Compass bearing: clockwise from north (top), always 0–360°.
+  // Math.atan2 returns CCW from east; bearing = (90 − math_deg + 360) % 360.
+  const mathDeg = Math.atan2(ns.im, ns.re) * 180 / Math.PI;
+  const bearing = ((90 - mathDeg) % 360 + 360) % 360;
+  set("wye-neutral-ang", bearing.toFixed(1));
   set("wye-imbalance",   voltageImbalance(v1, v2, v3).toFixed(2));
   drawWyeDiagram(v1, v2, v3, ll12, ll13, ll23);
   drawNeutralMini(ns.re, ns.im, nMag);
