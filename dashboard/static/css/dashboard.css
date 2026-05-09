@@ -835,10 +835,9 @@ html, body {
   box-shadow: none;
 }
 
-/* Tab bar: no extra left/right padding needed — inherited from > * above. */
+/* Tab bar: left/right padding comes from the .sticky-chrome > * constraint
+ * (24px, matching .main). Only override margin and border. */
 .sticky-chrome .tab-bar {
-  padding-left: 0;
-  padding-right: 0;
   margin-bottom: 0;
   border-bottom: none; /* chrome border-bottom serves this purpose */
 }
