@@ -228,7 +228,7 @@ function createChart(id, series, showLegend = true) {
         fill:            false,
         tension:         0.1,
         pointRadius:     0,
-        borderWidth:     s.borderWidth ?? 2,
+        borderWidth:     s.borderWidth ?? 1.5,
         borderCapStyle:  "round"
     }));
 

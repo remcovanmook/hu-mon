@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Stack the L1/L2/L3 phases together as filled areas, leave Net Grid as an overlay line
     charts.grid.options.scales.y.stacked = true;
     charts.grid.data.datasets[0].stack = 'net';
-    charts.grid.data.datasets[0].borderWidth = 3;
+    charts.grid.data.datasets[0].borderWidth = 2;
     
     for(let i=1; i<=3; i++) {
         charts.grid.data.datasets[i].stack = 'phases';
@@ -233,7 +233,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     charts.eps.options.scales.y.stacked = true;
     charts.eps.options.scales.y.min = 0;
     charts.eps.data.datasets[0].stack = 'net';
-    charts.eps.data.datasets[0].borderWidth = 3;
+    charts.eps.data.datasets[0].borderWidth = 2;
     for(let i=1; i<=3; i++) {
         charts.eps.data.datasets[i].stack = 'phases';
         charts.eps.data.datasets[i].fill = true;
