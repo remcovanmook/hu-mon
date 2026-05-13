@@ -19,6 +19,36 @@ let lastStatus = null;
 
 const charts = {};
 const maxPoints = 60;
+
+/**
+ * Frequency chart severity bands — green/amber/red background boxes.
+ *
+ * Kept as a frozen plain object at module scope so loadHistory and the SSE
+ * handler can merge it into annotation configs without reading back from
+ * the annotation plugin's Proxy (which causes infinite recursion).
+ */
+const FREQ_BANDS = Object.freeze({
+    bandGreen: {
+        type: "box", yMin: 49.95, yMax: 50.05, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(34, 197, 94, 0.08)", borderWidth: 0,
+    },
+    bandAmberLow: {
+        type: "box", yMin: 49.9, yMax: 49.95, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+    },
+    bandAmberHigh: {
+        type: "box", yMin: 50.05, yMax: 50.1, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+    },
+    bandRedLow: {
+        type: "box", yMin: 49.85, yMax: 49.9, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+    },
+    bandRedHigh: {
+        type: "box", yMin: 50.1, yMax: 50.15, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+    },
+});
 const STATUS_MAP = {
     0: "STANDBY",
     1: "SELF-TEST",
@@ -261,30 +291,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return (v === 49.9 || v === 50.1) ? 1.5 : 1;
         },
     };
-    // Severity bands via annotation boxes.
-    charts.freq.options.plugins.annotation.annotations = {
-        ...charts.freq.options.plugins.annotation.annotations,
-        bandGreen: {
-            type: "box", yMin: 49.95, yMax: 50.05, drawTime: "beforeDatasetsDraw",
-            backgroundColor: "rgba(34, 197, 94, 0.08)", borderWidth: 0,
-        },
-        bandAmberLow: {
-            type: "box", yMin: 49.9, yMax: 49.95, drawTime: "beforeDatasetsDraw",
-            backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
-        },
-        bandAmberHigh: {
-            type: "box", yMin: 50.05, yMax: 50.1, drawTime: "beforeDatasetsDraw",
-            backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
-        },
-        bandRedLow: {
-            type: "box", yMin: 49.85, yMax: 49.9, drawTime: "beforeDatasetsDraw",
-            backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
-        },
-        bandRedHigh: {
-            type: "box", yMin: 50.1, yMax: 50.15, drawTime: "beforeDatasetsDraw",
-            backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
-        },
-    };
+    charts.freq.options.plugins.annotation.annotations = { ...FREQ_BANDS };
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
@@ -395,14 +402,11 @@ async function loadHistory(since) {
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
-            // Preserve chart-specific annotations (e.g. freq severity bands)
-            // while replacing status markers with the freshly computed set.
-            const existing = charts[k].options.plugins.annotation.annotations || {};
-            const chartOwn = {};
-            for (const [key, val] of Object.entries(existing)) {
-                if (key.startsWith("band")) chartOwn[key] = val;
-            }
-            charts[k].options.plugins.annotation.annotations = Object.assign(chartOwn, statusAnnotations);
+            // Merge status annotations with any chart-specific static bands.
+            // FREQ_BANDS is a plain object; never read back from the chart's
+            // proxied annotation config to avoid infinite recursion.
+            const chartBands = (k === "freq") ? FREQ_BANDS : {};
+            charts[k].options.plugins.annotation.annotations = { ...chartBands, ...statusAnnotations };
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
         });
@@ -522,7 +526,8 @@ function connectSSE() {
             Object.values(charts).forEach(chart => {
                 if(chart) {
                     chart.options.scales.x.min = flooredMin;
-                    chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations, ...statusAnnotations };
+                    const bands = (chart === charts.freq) ? FREQ_BANDS : {};
+                    chart.options.plugins.annotation.annotations = { ...bands, ...statusAnnotations };
                     // Render immediately so the marker is visible before the
                     // bulk chart.update() at the end of the SSE handler.
                     chart.update("none");

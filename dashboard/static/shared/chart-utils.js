@@ -523,16 +523,13 @@ function initSparklineModal() {
             // Clone labels array (used by createChart-style charts).
             const labels = srcChart.data.labels ? [...srcChart.data.labels] : [];
 
-            // Build modal chart options: responsive, with legend + visible X ticks.
+            // Build modal chart options: responsive, visible X ticks, no legend
+            // (single-dataset sparklines; the modal title identifies the metric).
             const srcScales = srcChart.options.scales || {};
             const srcY      = srcScales.y || {};
 
             const opts = getBaseOpts();
-            opts.plugins.legend = {
-                display:  true,
-                position: "bottom",
-                labels:   { usePointStyle: true, boxWidth: 8, padding: 16 },
-            };
+            opts.plugins.legend = { display: false };
             opts.scales.x.ticks = { maxTicksLimit: 12 };
             opts.scales.x.border = { display: true };
 
