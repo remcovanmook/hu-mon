@@ -141,9 +141,21 @@ def create_app(store: GrowattStore) -> Flask:
 
     @app.route('/api/history')
     def history():
+        """Return 1-minute bucketed readings for the requested time window.
+
+        Query parameters:
+            hours (int): Look-back window in hours. Default 24.
+            since (int): Unix-ms start timestamp. Takes precedence over hours
+                         when provided, enabling calendar-based ranges (Today,
+                         This week, This month).
+        """
         from flask import request
-        hours = int(request.args.get('hours', 24))
-        since = int(time.time() * 1000) - (hours * 3600 * 1000)
+        since_param = request.args.get('since')
+        if since_param is not None:
+            since = int(since_param)
+        else:
+            hours = int(request.args.get('hours', 24))
+            since = int(time.time() * 1000) - (hours * 3600 * 1000)
 
         conn = store._get_conn()
         cur = conn.cursor()

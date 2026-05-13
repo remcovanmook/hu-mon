@@ -19,6 +19,36 @@ let lastStatus = null;
 
 const charts = {};
 const maxPoints = 60;
+
+/**
+ * Frequency chart severity bands — green/amber/red background boxes.
+ *
+ * Kept as a frozen plain object at module scope so loadHistory and the SSE
+ * handler can merge it into annotation configs without reading back from
+ * the annotation plugin's Proxy (which causes infinite recursion).
+ */
+const FREQ_BANDS = Object.freeze({
+    bandGreen: {
+        type: "box", yMin: 49.95, yMax: 50.05, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(34, 197, 94, 0.08)", borderWidth: 0,
+    },
+    bandAmberLow: {
+        type: "box", yMin: 49.9, yMax: 49.95, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+    },
+    bandAmberHigh: {
+        type: "box", yMin: 50.05, yMax: 50.1, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+    },
+    bandRedLow: {
+        type: "box", yMin: 49.85, yMax: 49.9, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+    },
+    bandRedHigh: {
+        type: "box", yMin: 50.1, yMax: 50.15, drawTime: "beforeDatasetsDraw",
+        backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+    },
+});
 const STATUS_MAP = {
     0: "STANDBY",
     1: "SELF-TEST",
@@ -122,10 +152,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     recolorCharts();   // populate WYE_CSS before first draw
     initWyeDiagram();
     initFlowScale();
+    initSparklineModal();
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {
-        const hours = Number.parseInt(e.target.value, 10);
+        const rangeValue = e.target.value;
         // Clear all charts
         Object.values(charts).forEach(c => {
             if (c) {
@@ -143,9 +174,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusAnnotations = {};
         lastStatus = null;
 
-        currentHours = hours;
-        localStorage.setItem('growatt-range', hours);
-        loadHistory(hours);
+        currentRange = rangeValue;
+        localStorage.setItem('growatt-range', rangeValue);
+        loadHistory(resolveRangeSince(rangeValue));
     });
     
     // Auto-create DOM cards for phase arrays matching HEGG template
@@ -218,7 +249,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Stack the L1/L2/L3 phases together as filled areas, leave Net Grid as an overlay line
     charts.grid.options.scales.y.stacked = true;
     charts.grid.data.datasets[0].stack = 'net';
-    charts.grid.data.datasets[0].borderWidth = 3;
+    charts.grid.data.datasets[0].borderWidth = 2;
     
     for(let i=1; i<=3; i++) {
         charts.grid.data.datasets[i].stack = 'phases';
@@ -233,20 +264,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     charts.eps.options.scales.y.stacked = true;
     charts.eps.options.scales.y.min = 0;
     charts.eps.data.datasets[0].stack = 'net';
-    charts.eps.data.datasets[0].borderWidth = 3;
+    charts.eps.data.datasets[0].borderWidth = 2;
     for(let i=1; i<=3; i++) {
         charts.eps.data.datasets[i].stack = 'phases';
         charts.eps.data.datasets[i].fill = true;
     }
     
     charts.freq = createChart('chart-freq', [{ label: 'Grid Freq', color: COLORS.pv1 }], false);
-    // Fixed Y range: nominal 50 Hz ± 0.25 Hz (EN 50160 nominal tolerance).
-    charts.freq.options.scales.y.min = 49.75;
-    charts.freq.options.scales.y.max = 50.25;
+    // Fixed Y range: 49.85–50.15 Hz, grid every 0.05 Hz.
+    // Background bands: green (±0.05), amber (±0.05–0.1), red (>±0.1).
+    charts.freq.options.scales.y.min = 49.85;
+    charts.freq.options.scales.y.max = 50.15;
     charts.freq.options.scales.y.ticks = {
+        stepSize: 0.05,
         callback: (v) => v.toFixed(2),
-        maxTicksLimit: 6,
     };
+    charts.freq.options.scales.y.grid = {
+        display: true,
+        color: (ctx) => {
+            const v = ctx.tick.value;
+            if (v === 49.9 || v === 50.1) return "rgba(220, 38, 38, 0.7)";
+            return "rgba(128, 128, 128, 0.15)";
+        },
+        lineWidth: (ctx) => {
+            const v = ctx.tick.value;
+            return (v === 49.9 || v === 50.1) ? 1.5 : 1;
+        },
+    };
+    charts.freq.options.plugins.annotation.annotations = { ...FREQ_BANDS };
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
@@ -263,7 +308,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const savedRange = localStorage.getItem('growatt-range');
     if (savedRange && rangeEl) {
         rangeEl.value = savedRange;   // update the <select> display
-        currentHours = Number.parseInt(savedRange, 10);
+        currentRange = savedRange;
     }
 
     // Restore the last active tab; fall back to 'overview'.
@@ -273,20 +318,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Await history so lastStatus is correctly seeded before SSE connects.
     // Connecting SSE before history loads risks lastStatus being set by the
     // first live reading, causing the first real status-change to be missed.
-    await loadHistory(currentHours);
+    await loadHistory(resolveRangeSince(currentRange));
     connectSSE();
     recolorCharts();
 });
 
-// currentHours is initialised from localStorage in DOMContentLoaded;
-// the literal 24 here acts as a safe default before that runs.
-let currentHours = 24;
+// currentRange is initialised from localStorage in DOMContentLoaded;
+// the literal "24" here acts as a safe default before that runs.
+let currentRange = "24";
 
 
 
-async function loadHistory(hours = 24) {
+async function loadHistory(since) {
     try {
-        const res = await fetch(`/api/history?hours=${hours}`);
+        const res = await fetch(`/api/history?since=${since}`);
         if(!res.ok) return;
         const data = await res.json();
         if(data.length === 0) return;
@@ -351,13 +396,33 @@ async function loadHistory(hours = 24) {
             }
         });
         
-        const flooredMin = Date.now() - hours * 3600000;
+        const flooredMin = since;
 
         // Apply global sync and datasets
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
-            charts[k].options.plugins.annotation.annotations = Object.assign({}, statusAnnotations);
+
+            // For multi-day ranges, force daily tick marks with date labels.
+            const xTime = charts[k].options.scales.x.time;
+            const useDayTicks = currentRange === "week" || currentRange === "month"
+                || currentRange === "168";
+            if (useDayTicks) {
+                xTime.unit = "day";
+                xTime.stepSize = 1;
+                xTime.displayFormats = { day: "dd-MM" };
+                charts[k].options.scales.x.ticks.maxTicksLimit = undefined;
+            } else {
+                delete xTime.unit;
+                delete xTime.stepSize;
+                delete xTime.displayFormats;
+                charts[k].options.scales.x.ticks.maxTicksLimit = 6;
+            }
+            // Merge status annotations with any chart-specific static bands.
+            // FREQ_BANDS is a plain object; never read back from the chart's
+            // proxied annotation config to avoid infinite recursion.
+            const chartBands = (k === "freq") ? FREQ_BANDS : {};
+            charts[k].options.plugins.annotation.annotations = { ...chartBands, ...statusAnnotations };
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
         });
@@ -470,26 +535,23 @@ function connectSSE() {
         }
         updateDOM("meta-fault", faultStr);
 
-        const flooredMin = Date.now() - currentHours * 3600000;
+        const flooredMin = resolveRangeSince(currentRange);
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
-        if (statusStr !== lastStatus && lastStatus !== null) {
-            statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
-            Object.values(charts).forEach(chart => {
-                if(chart) {
-                    chart.options.scales.x.min = flooredMin;
-                    chart.options.plugins.annotation.annotations = { ...chart.options.plugins.annotation.annotations, ...statusAnnotations };
-                    // Render immediately so the marker is visible before the
-                    // bulk chart.update() at the end of the SSE handler.
-                    chart.update("none");
-                }
-            });
-        } else {
-            Object.values(charts).forEach(chart => {
-                if(chart) {
-                    chart.options.scales.x.min = flooredMin;
-                }
-            });
+        const statusChanged = statusStr !== lastStatus && lastStatus !== null;
+        const annotationKey = statusChanged ? `status_${d.ts}` : null;
+        if (statusChanged) {
+            statusAnnotations[annotationKey] = buildStatusAnnotation(d.ts, statusStr);
         }
+        Object.values(charts).forEach(chart => {
+            if (!chart) return;
+            chart.options.scales.x.min = flooredMin;
+            // Mutate the existing annotations object in place so the
+            // annotation plugin's Proxy picks up the change immediately.
+            if (statusChanged) {
+                const anns = chart.options.plugins.annotation.annotations;
+                anns[annotationKey] = statusAnnotations[annotationKey];
+            }
+        });
         lastStatus = statusStr;
         updateDOM("meta-status", statusStr);
         
