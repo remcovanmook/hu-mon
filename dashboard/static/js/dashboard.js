@@ -537,25 +537,21 @@ function connectSSE() {
 
         const flooredMin = resolveRangeSince(currentRange);
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
-        if (statusStr !== lastStatus && lastStatus !== null) {
-            statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
-            Object.values(charts).forEach(chart => {
-                if(chart) {
-                    chart.options.scales.x.min = flooredMin;
-                    const bands = (chart === charts.freq) ? FREQ_BANDS : {};
-                    chart.options.plugins.annotation.annotations = { ...bands, ...statusAnnotations };
-                    // Render immediately so the marker is visible before the
-                    // bulk chart.update() at the end of the SSE handler.
-                    chart.update("none");
-                }
-            });
-        } else {
-            Object.values(charts).forEach(chart => {
-                if(chart) {
-                    chart.options.scales.x.min = flooredMin;
-                }
-            });
+        const statusChanged = statusStr !== lastStatus && lastStatus !== null;
+        const annotationKey = statusChanged ? `status_${d.ts}` : null;
+        if (statusChanged) {
+            statusAnnotations[annotationKey] = buildStatusAnnotation(d.ts, statusStr);
         }
+        Object.values(charts).forEach(chart => {
+            if (!chart) return;
+            chart.options.scales.x.min = flooredMin;
+            // Mutate the existing annotations object in place so the
+            // annotation plugin's Proxy picks up the change immediately.
+            if (statusChanged) {
+                const anns = chart.options.plugins.annotation.annotations;
+                anns[annotationKey] = statusAnnotations[annotationKey];
+            }
+        });
         lastStatus = statusStr;
         updateDOM("meta-status", statusStr);
         
