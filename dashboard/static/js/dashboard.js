@@ -241,12 +241,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     
     charts.freq = createChart('chart-freq', [{ label: 'Grid Freq', color: COLORS.pv1 }], false);
-    // Fixed Y range: nominal 50 Hz ± 0.25 Hz (EN 50160 nominal tolerance).
-    charts.freq.options.scales.y.min = 49.75;
-    charts.freq.options.scales.y.max = 50.25;
+    // Fixed Y range: 49.85–50.15 Hz, grid every 0.05 Hz.
+    // Background bands: green (±0.05), amber (±0.05–0.1), red (>±0.1).
+    charts.freq.options.scales.y.min = 49.85;
+    charts.freq.options.scales.y.max = 50.15;
     charts.freq.options.scales.y.ticks = {
+        stepSize: 0.05,
         callback: (v) => v.toFixed(2),
-        maxTicksLimit: 6,
+    };
+    charts.freq.options.scales.y.grid = {
+        display: true,
+        color: (ctx) => {
+            const v = ctx.tick.value;
+            if (v === 49.9 || v === 50.1) return "rgba(220, 38, 38, 0.7)";
+            return "rgba(128, 128, 128, 0.15)";
+        },
+        lineWidth: (ctx) => {
+            const v = ctx.tick.value;
+            return (v === 49.9 || v === 50.1) ? 1.5 : 1;
+        },
+    };
+    // Severity bands via annotation boxes.
+    charts.freq.options.plugins.annotation.annotations = {
+        ...charts.freq.options.plugins.annotation.annotations,
+        bandGreen: {
+            type: "box", yMin: 49.95, yMax: 50.05, drawTime: "beforeDatasetsDraw",
+            backgroundColor: "rgba(34, 197, 94, 0.08)", borderWidth: 0,
+        },
+        bandAmberLow: {
+            type: "box", yMin: 49.9, yMax: 49.95, drawTime: "beforeDatasetsDraw",
+            backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+        },
+        bandAmberHigh: {
+            type: "box", yMin: 50.05, yMax: 50.1, drawTime: "beforeDatasetsDraw",
+            backgroundColor: "rgba(245, 158, 11, 0.10)", borderWidth: 0,
+        },
+        bandRedLow: {
+            type: "box", yMin: 49.85, yMax: 49.9, drawTime: "beforeDatasetsDraw",
+            backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+        },
+        bandRedHigh: {
+            type: "box", yMin: 50.1, yMax: 50.15, drawTime: "beforeDatasetsDraw",
+            backgroundColor: "rgba(220, 38, 38, 0.10)", borderWidth: 0,
+        },
     };
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
@@ -358,7 +395,14 @@ async function loadHistory(since) {
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
-            charts[k].options.plugins.annotation.annotations = Object.assign({}, statusAnnotations);
+            // Preserve chart-specific annotations (e.g. freq severity bands)
+            // while replacing status markers with the freshly computed set.
+            const existing = charts[k].options.plugins.annotation.annotations || {};
+            const chartOwn = {};
+            for (const [key, val] of Object.entries(existing)) {
+                if (key.startsWith("band")) chartOwn[key] = val;
+            }
+            charts[k].options.plugins.annotation.annotations = Object.assign(chartOwn, statusAnnotations);
             charts[k].data.labels = [...labels];
             charts[k].data.datasets.forEach((c, i) => c.data = [...(ds[k][i] || [])]);
         });
