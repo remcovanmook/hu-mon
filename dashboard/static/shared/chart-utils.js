@@ -358,3 +358,190 @@ function switchTab(id) {
     if (panel) panel.hidden = false;
     document.dispatchEvent(new CustomEvent("dashboard:tabswitch", { detail: { id } }));
 }
+
+// ── Sparkline modal ───────────────────────────────────────────────────────────
+
+/**
+ * Initialise click-to-expand behaviour for inline sparkline charts.
+ *
+ * Clicking any canvas inside a .chart-wrapper--inline container opens a
+ * full-viewport modal that renders the same data at a larger size with
+ * legend and X-axis labels visible.
+ *
+ * The modal overlay, canvas, and close button are created once on first
+ * invocation (lazy singleton) and reused across subsequent clicks.
+ * The expanded Chart.js instance is destroyed and recreated each time
+ * so it always reflects the source chart's current state.
+ *
+ * Close triggers: overlay click, ✕ button, Escape key.
+ *
+ * Call this once after DOMContentLoaded — it uses event delegation on
+ * document.body so dynamically-added sparklines are covered automatically.
+ */
+function initSparklineModal() {
+    let overlay    = null;
+    let modalChart = null;
+
+    /** Build the modal DOM on first use and return the overlay element. */
+    function ensureDOM() {
+        if (overlay) return overlay;
+
+        overlay = document.createElement("div");
+        overlay.className = "spark-modal-overlay";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-label", "Expanded chart");
+        // Starts closed; .open class controls visibility (avoids browser
+        // [hidden]{display:none} specificity issues).
+
+        const card = document.createElement("div");
+        card.className = "spark-modal-card";
+
+        const header = document.createElement("div");
+        header.className = "spark-modal-header";
+
+        const title = document.createElement("span");
+        title.className = "spark-modal-title";
+        title.id = "spark-modal-title";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.className = "spark-modal-close";
+        closeBtn.setAttribute("aria-label", "Close");
+        closeBtn.textContent = "\u2715";
+        closeBtn.addEventListener("click", close);
+
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        const wrap = document.createElement("div");
+        wrap.className = "spark-modal-chart-wrap";
+
+        const canvas = document.createElement("canvas");
+        canvas.id = "spark-modal-canvas";
+        wrap.appendChild(canvas);
+
+        card.appendChild(header);
+        card.appendChild(wrap);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) close();
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && overlay.classList.contains("open")) close();
+        });
+
+        return overlay;
+    }
+
+    /** Close the modal and destroy the temporary chart instance. */
+    function close() {
+        if (!overlay) return;
+        overlay.classList.remove("open");
+        if (modalChart) { modalChart.destroy(); modalChart = null; }
+    }
+
+    /**
+     * Open the modal with a full-size clone of the given Chart.js instance.
+     *
+     * Copies datasets (data + visual config) and scale/annotation settings
+     * from the source chart.  Enables legend and X-axis labels so the
+     * expanded view is more informative than the inline sparkline.
+     *
+     * @param {Chart} srcChart - The source Chart.js instance to expand.
+     */
+    function open(srcChart) {
+        ensureDOM();
+        if (modalChart) { modalChart.destroy(); modalChart = null; }
+
+        // Derive a human-readable title from the canvas aria-label or
+        // the first dataset label, falling back to "Chart".
+        const ariaLabel = srcChart.canvas.getAttribute("aria-label");
+        const dsLabel   = srcChart.data.datasets[0]?.label;
+        const titleEl   = document.getElementById("spark-modal-title");
+        if (titleEl) titleEl.textContent = ariaLabel || dsLabel || "Chart";
+
+        // Show the overlay BEFORE creating the chart so the canvas
+        // has non-zero dimensions for Chart.js to measure.
+        overlay.classList.add("open");
+
+        try {
+            // Deep-clone datasets: copy data arrays and visual properties.
+            const datasets = srcChart.data.datasets.map(ds => ({
+                label:           ds.label,
+                data:            [...ds.data],
+                borderColor:     ds.borderColor,
+                backgroundColor: ds.backgroundColor,
+                fill:            ds.fill ?? false,
+                tension:         ds.tension ?? 0.3,
+                pointRadius:     0,
+                pointHitRadius:  6,
+                borderWidth:     ds.borderWidth ?? 1.5,
+                borderCapStyle:  ds.borderCapStyle || "round",
+                parsing:         ds.parsing ?? undefined,
+            }));
+
+            // Clone labels array (used by createChart-style charts).
+            const labels = srcChart.data.labels ? [...srcChart.data.labels] : [];
+
+            // Build modal chart options: responsive, with legend + visible X ticks.
+            const srcScales = srcChart.options.scales || {};
+            const srcY      = srcScales.y || {};
+
+            const opts = getBaseOpts();
+            opts.plugins.legend = {
+                display:  true,
+                position: "bottom",
+                labels:   { usePointStyle: true, boxWidth: 8, padding: 16 },
+            };
+            opts.scales.x.ticks = { maxTicksLimit: 12 };
+            opts.scales.x.border = { display: true };
+
+            // Carry over Y-axis range if the source has explicit min/max.
+            if (srcY.min !== undefined) opts.scales.y.min = srcY.min;
+            if (srcY.max !== undefined) opts.scales.y.max = srcY.max;
+            if (srcY.ticks) {
+                opts.scales.y.ticks = { ...srcY.ticks };
+            }
+
+            // Copy annotation overlays (min/max bands, status markers).
+            // JSON round-trip drops any function-valued keys that
+            // structuredClone would choke on.
+            const srcAnns = srcChart.options.plugins?.annotation?.annotations;
+            if (srcAnns) {
+                try { opts.plugins.annotation = { annotations: JSON.parse(JSON.stringify(srcAnns)) }; }
+                catch { /* skip annotations if they contain non-serialisable values */ }
+            }
+
+            const canvas = document.getElementById("spark-modal-canvas");
+            modalChart = new Chart(canvas.getContext("2d"), {
+                type: "line",
+                data: { labels, datasets },
+                options: opts,
+            });
+        } catch (err) {
+            console.error("Sparkline modal chart error:", err);
+        }
+    }
+
+    // Event delegation: clicking anywhere on a card that contains an inline
+    // sparkline opens the modal.  Targets both card types:
+    //   .card--with-chart  — phase voltage/current cards (both repos)
+    //   .mini-chart        — freq/temp cards (Growatt)
+    const CARD_SELECTOR = ".card--with-chart, .mini-chart";
+
+    document.addEventListener("click", (e) => {
+        const card = e.target.closest(CARD_SELECTOR);
+        if (!card) return;
+
+        const canvas = card.querySelector("canvas");
+        if (!canvas) return;
+
+        const chartInstance = Chart.getChart(canvas);
+        if (!chartInstance) return;
+
+        open(chartInstance);
+    });
+}

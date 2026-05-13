@@ -122,6 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     recolorCharts();   // populate WYE_CSS before first draw
     initWyeDiagram();
     initFlowScale();
+    initSparklineModal();
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {
