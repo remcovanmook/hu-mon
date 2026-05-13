@@ -402,6 +402,22 @@ async function loadHistory(since) {
         Object.keys(charts).forEach(k => {
             if(!charts[k] || !ds[k]) return;
             charts[k].options.scales.x.min = flooredMin;
+
+            // For multi-day ranges, force daily tick marks with date labels.
+            const xTime = charts[k].options.scales.x.time;
+            const useDayTicks = currentRange === "week" || currentRange === "month"
+                || currentRange === "168";
+            if (useDayTicks) {
+                xTime.unit = "day";
+                xTime.stepSize = 1;
+                xTime.displayFormats = { day: "dd-MM" };
+                charts[k].options.scales.x.ticks.maxTicksLimit = undefined;
+            } else {
+                delete xTime.unit;
+                delete xTime.stepSize;
+                delete xTime.displayFormats;
+                charts[k].options.scales.x.ticks.maxTicksLimit = 6;
+            }
             // Merge status annotations with any chart-specific static bands.
             // FREQ_BANDS is a plain object; never read back from the chart's
             // proxied annotation config to avoid infinite recursion.
