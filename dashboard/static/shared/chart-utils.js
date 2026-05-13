@@ -17,12 +17,49 @@
  *   initFlowScale()                                   – SVG flow diagram scaler
  *   switchTab(id)                                     – tab panel switcher
  *                                                       (fires dashboard:tabswitch)
+ *   resolveRangeSince(value)                            – convert range select value
+ *                                                       to a since-ms timestamp
  *
  * Load order: load after theme.js, before app-specific JS.
  * Requires: Chart.js (global Chart), chartjs-plugin-annotation.
  */
 
 "use strict";
+
+// ── History range resolution ──────────────────────────────────────────────────
+
+/**
+ * Resolve a history-range <select> value to a "since" timestamp in
+ * milliseconds.
+ *
+ * Numeric values ("1", "6", "24", etc.) are treated as hours relative to
+ * now.  Calendar keywords use the browser's local timezone:
+ *
+ *   "today"  – midnight of the current day
+ *   "week"   – midnight of Monday (ISO week start)
+ *   "month"  – midnight of the 1st of the current month
+ *
+ * @param {string} value - The <select> option value.
+ * @returns {number} Unix timestamp in milliseconds.
+ */
+function resolveRangeSince(value) {
+    const now = new Date();
+    switch (value) {
+        case "today":
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        case "week": {
+            // ISO week: Monday = start.  JS getDay(): 0=Sun, 1=Mon … 6=Sat.
+            const daysSinceMonday = (now.getDay() + 6) % 7;
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday).getTime();
+        }
+        case "month":
+            return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        default: {
+            const hours = Number.parseInt(value, 10) || 24;
+            return Date.now() - hours * 3_600_000;
+        }
+    }
+}
 
 // ── Y-axis scaling ────────────────────────────────────────────────────────────
 

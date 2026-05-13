@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     
     document.getElementById("history-range").addEventListener("change", (e) => {
-        const hours = Number.parseInt(e.target.value, 10);
+        const rangeValue = e.target.value;
         // Clear all charts
         Object.values(charts).forEach(c => {
             if (c) {
@@ -144,9 +144,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         statusAnnotations = {};
         lastStatus = null;
 
-        currentHours = hours;
-        localStorage.setItem('growatt-range', hours);
-        loadHistory(hours);
+        currentRange = rangeValue;
+        localStorage.setItem('growatt-range', rangeValue);
+        loadHistory(resolveRangeSince(rangeValue));
     });
     
     // Auto-create DOM cards for phase arrays matching HEGG template
@@ -264,7 +264,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const savedRange = localStorage.getItem('growatt-range');
     if (savedRange && rangeEl) {
         rangeEl.value = savedRange;   // update the <select> display
-        currentHours = Number.parseInt(savedRange, 10);
+        currentRange = savedRange;
     }
 
     // Restore the last active tab; fall back to 'overview'.
@@ -274,20 +274,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Await history so lastStatus is correctly seeded before SSE connects.
     // Connecting SSE before history loads risks lastStatus being set by the
     // first live reading, causing the first real status-change to be missed.
-    await loadHistory(currentHours);
+    await loadHistory(resolveRangeSince(currentRange));
     connectSSE();
     recolorCharts();
 });
 
-// currentHours is initialised from localStorage in DOMContentLoaded;
-// the literal 24 here acts as a safe default before that runs.
-let currentHours = 24;
+// currentRange is initialised from localStorage in DOMContentLoaded;
+// the literal "24" here acts as a safe default before that runs.
+let currentRange = "24";
 
 
 
-async function loadHistory(hours = 24) {
+async function loadHistory(since) {
     try {
-        const res = await fetch(`/api/history?hours=${hours}`);
+        const res = await fetch(`/api/history?since=${since}`);
         if(!res.ok) return;
         const data = await res.json();
         if(data.length === 0) return;
@@ -352,7 +352,7 @@ async function loadHistory(hours = 24) {
             }
         });
         
-        const flooredMin = Date.now() - hours * 3600000;
+        const flooredMin = since;
 
         // Apply global sync and datasets
         Object.keys(charts).forEach(k => {
@@ -471,7 +471,7 @@ function connectSSE() {
         }
         updateDOM("meta-fault", faultStr);
 
-        const flooredMin = Date.now() - currentHours * 3600000;
+        const flooredMin = resolveRangeSince(currentRange);
         let statusStr = STATUS_MAP[d.status_code] || "UNKNOWN";
         if (statusStr !== lastStatus && lastStatus !== null) {
             statusAnnotations[`status_${d.ts}`] = buildStatusAnnotation(d.ts, statusStr);
