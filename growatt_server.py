@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import threading
 import time
 
@@ -17,37 +18,79 @@ logging.basicConfig(
 logger = logging.getLogger("growatt_server")
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--device-ip", required=True, help="Datalogger IP")
-    parser.add_argument("--datalogger-port", type=int, default=502)
-    parser.add_argument("--proxy-port", type=int, default=5020)
-    parser.add_argument("--http-port", type=int, default=8080)
-    parser.add_argument("--db", default="growatt.db")
+    """
+    Growatt all-in-one server entry point.
+
+    Starts the telemetry collector, optional Modbus proxy, optional MQTT
+    and InfluxDB exporters, and the Flask dashboard.
+
+    Configuration is read from environment variables (typically loaded via
+    /etc/default/growatt by the init system).  Command-line arguments
+    override env vars when provided.
+    """
+    parser = argparse.ArgumentParser(
+        description="Growatt Modbus Proxy & Telemetry Server"
+    )
+    parser.add_argument("--device-ip",
+        default=os.environ.get("GROWATT_DEVICE_IP"),
+        help="Datalogger IP address (env: GROWATT_DEVICE_IP)")
+    parser.add_argument("--datalogger-port", type=int,
+        default=int(os.environ.get("GROWATT_DATALOGGER_PORT", "502")),
+        help="Modbus TCP port on the datalogger (env: GROWATT_DATALOGGER_PORT, default: 502)")
+    parser.add_argument("--proxy-port", type=int,
+        default=int(os.environ.get("GROWATT_PROXY_PORT", "5020")),
+        help="Modbus proxy listen port, 0 to disable (env: GROWATT_PROXY_PORT, default: 5020)")
+    parser.add_argument("--http-port", type=int,
+        default=int(os.environ.get("GROWATT_HTTP_PORT", "8081")),
+        help="Dashboard HTTP port (env: GROWATT_HTTP_PORT, default: 8081)")
+    parser.add_argument("--db",
+        default=os.environ.get("GROWATT_DB", "growatt.db"),
+        help="SQLite database path (env: GROWATT_DB, default: growatt.db)")
     
     # MQTT Options
-    parser.add_argument("--mqtt-host", default="")
-    parser.add_argument("--mqtt-port", type=int, default=1883)
-    parser.add_argument("--mqtt-user", default="")
-    parser.add_argument("--mqtt-pass", default="")
-    parser.add_argument("--mqtt-topic-prefix", default="",
-                        help="MQTT topic prefix (default: growatt/<serial>/)")
+    parser.add_argument("--mqtt-host",
+        default=os.environ.get("GROWATT_MQTT_HOST", ""),
+        help="MQTT broker host, empty to disable (env: GROWATT_MQTT_HOST)")
+    parser.add_argument("--mqtt-port", type=int,
+        default=int(os.environ.get("GROWATT_MQTT_PORT", "1883")),
+        help="MQTT broker port (env: GROWATT_MQTT_PORT, default: 1883)")
+    parser.add_argument("--mqtt-user",
+        default=os.environ.get("GROWATT_MQTT_USER", ""),
+        help="MQTT username (env: GROWATT_MQTT_USER)")
+    parser.add_argument("--mqtt-pass",
+        default=os.environ.get("GROWATT_MQTT_PASS", ""),
+        help="MQTT password (env: GROWATT_MQTT_PASS)")
+    parser.add_argument("--mqtt-topic-prefix",
+        default=os.environ.get("GROWATT_MQTT_TOPIC_PREFIX", ""),
+        help="MQTT topic prefix (env: GROWATT_MQTT_TOPIC_PREFIX, default: growatt/<serial>/)")
     
     # InfluxDB Options
-    parser.add_argument("--influx-url", default="")
-    parser.add_argument("--influx-token", default="")
-    parser.add_argument("--influx-org", default="")
-    parser.add_argument("--influx-bucket", default="")
-    parser.add_argument("--influx-db", default="growatt")
+    parser.add_argument("--influx-url",
+        default=os.environ.get("GROWATT_INFLUX_URL", ""),
+        help="InfluxDB URL, empty to disable (env: GROWATT_INFLUX_URL)")
+    parser.add_argument("--influx-token",
+        default=os.environ.get("GROWATT_INFLUX_TOKEN", ""),
+        help="InfluxDB auth token (env: GROWATT_INFLUX_TOKEN)")
+    parser.add_argument("--influx-org",
+        default=os.environ.get("GROWATT_INFLUX_ORG", ""),
+        help="InfluxDB organisation (env: GROWATT_INFLUX_ORG)")
+    parser.add_argument("--influx-bucket",
+        default=os.environ.get("GROWATT_INFLUX_BUCKET", ""),
+        help="InfluxDB bucket (env: GROWATT_INFLUX_BUCKET)")
+    parser.add_argument("--influx-db",
+        default=os.environ.get("GROWATT_INFLUX_DB", "growatt"),
+        help="InfluxDB v1 database name (env: GROWATT_INFLUX_DB, default: growatt)")
 
     # Driver override (optional — auto-detected by default)
-    parser.add_argument(
-        "--driver",
-        default=None,
+    parser.add_argument("--driver",
+        default=os.environ.get("GROWATT_DRIVER"),
         metavar="DRIVER_ID",
-        help="Force a specific driver ID (e.g. growatt_mod_hu). Default: auto-detect.",
-    )
+        help="Force a specific driver ID (env: GROWATT_DRIVER, default: auto-detect)")
 
     args = parser.parse_args()
+
+    if not args.device_ip:
+        parser.error("Device IP is required. Set GROWATT_DEVICE_IP or pass --device-ip.")
 
     store = GrowattStore(args.db)
 
@@ -70,14 +113,17 @@ def main():
     ).start()
     logger.info("Collector thread started targeting %s:%d", args.device_ip, args.datalogger_port)
 
-    # 2. Start Modbus proxy server thread
-    threading.Thread(
-        target=run_modbus_server,
-        args=(store, proxy_cfg, args.proxy_port),
-        daemon=True,
-        name="growatt-proxy"
-    ).start()
-    logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, slave_id)
+    # 2. Start Modbus proxy server thread (optional — disabled when port is 0)
+    if args.proxy_port:
+        threading.Thread(
+            target=run_modbus_server,
+            args=(store, proxy_cfg, args.proxy_port),
+            daemon=True,
+            name="growatt-proxy"
+        ).start()
+        logger.info("Modbus proxy server started on port %d (slave_id=%d)", args.proxy_port, slave_id)
+    else:
+        logger.info("Modbus proxy disabled (port=0)")
 
     # 3. Start MQTT Exporter (Optional)
     if args.mqtt_host:
@@ -114,3 +160,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

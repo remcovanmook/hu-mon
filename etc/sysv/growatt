@@ -1,0 +1,75 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          growatt
+# Required-Start:    $network $remote_fs
+# Required-Stop:     $network $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Growatt Modbus Proxy & Telemetry Server
+# Description:       Collects inverter telemetry via Modbus TCP, exposes a
+#                    proxy endpoint and a web dashboard with Prometheus metrics.
+### END INIT INFO
+
+NAME=growatt
+DAEMON=/opt/growatt/.venv/bin/python
+DAEMON_ARGS="/opt/growatt/growatt_server.py"
+PIDFILE=/var/run/${NAME}.pid
+WORKDIR=/opt/growatt
+RUN_AS=growatt
+DEFAULTS=/etc/default/${NAME}
+
+# Source the environment file — this is the primary configuration mechanism.
+# All GROWATT_* variables defined there are exported into the daemon's
+# environment and read directly by the Python binary.
+if [ -f "$DEFAULTS" ]; then
+    . "$DEFAULTS"
+    export GROWATT_DEVICE_IP GROWATT_DB GROWATT_DATALOGGER_PORT \
+           GROWATT_PROXY_PORT GROWATT_HTTP_PORT GROWATT_DRIVER \
+           GROWATT_MQTT_HOST GROWATT_MQTT_PORT GROWATT_MQTT_USER \
+           GROWATT_MQTT_PASS GROWATT_MQTT_TOPIC_PREFIX \
+           GROWATT_INFLUX_URL GROWATT_INFLUX_TOKEN GROWATT_INFLUX_ORG \
+           GROWATT_INFLUX_BUCKET GROWATT_INFLUX_DB
+else
+    echo "Error: $DEFAULTS not found" >&2
+    exit 1
+fi
+
+. /lib/lsb/init-functions
+
+do_start() {
+    log_daemon_msg "Starting $NAME"
+    start-stop-daemon --start --quiet --background \
+        --make-pidfile --pidfile "$PIDFILE" \
+        --chuid "$RUN_AS" --chdir "$WORKDIR" \
+        --exec "$DAEMON" -- $DAEMON_ARGS
+    log_end_msg $?
+}
+
+do_stop() {
+    log_daemon_msg "Stopping $NAME"
+    start-stop-daemon --stop --quiet --pidfile "$PIDFILE" \
+        --retry=TERM/10/KILL/5
+    RETVAL=$?
+    rm -f "$PIDFILE"
+    log_end_msg $RETVAL
+}
+
+do_status() {
+    status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME"
+}
+
+case "$1" in
+    start)   do_start ;;
+    stop)    do_stop ;;
+    restart|force-reload)
+        do_stop
+        do_start
+        ;;
+    status)  do_status ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|force-reload|status}" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
