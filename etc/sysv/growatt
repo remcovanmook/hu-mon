@@ -18,7 +18,7 @@ WORKDIR=/opt/growatt
 RUN_AS=growatt
 DEFAULTS=/etc/default/${NAME}
 
-# Source the environment file — this is the primary configuration mechanism.
+# Source the environment file -- this is the primary configuration mechanism.
 # All GROWATT_* variables defined there are exported into the daemon's
 # environment and read directly by the Python binary.
 if [ -f "$DEFAULTS" ]; then

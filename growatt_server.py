@@ -81,7 +81,7 @@ def main():
         default=os.environ.get("GROWATT_INFLUX_DB", "growatt"),
         help="InfluxDB v1 database name (env: GROWATT_INFLUX_DB, default: growatt)")
 
-    # Driver override (optional — auto-detected by default)
+    # Driver override (optional -- auto-detected by default)
     parser.add_argument("--driver",
         default=os.environ.get("GROWATT_DRIVER"),
         metavar="DRIVER_ID",
@@ -113,7 +113,7 @@ def main():
     ).start()
     logger.info("Collector thread started targeting %s:%d", args.device_ip, args.datalogger_port)
 
-    # 2. Start Modbus proxy server thread (optional — disabled when port is 0)
+    # 2. Start Modbus proxy server thread (optional -- disabled when port is 0)
     if args.proxy_port:
         threading.Thread(
             target=run_modbus_server,

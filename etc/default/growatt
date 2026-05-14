@@ -2,12 +2,12 @@
 # Environment variables sourced by the systemd/sysv init system.
 # The Python binary reads these directly from its environment.
 
-# ── Required ──────────────────────────────────────────────────────────────────
+# -- Required ------------------------------------------------------------------
 
 # IP address of the ShineWifi-X2 datalogger
 GROWATT_DEVICE_IP=[IP_ADDRESS]
 
-# ── Paths & ports ─────────────────────────────────────────────────────────────
+# -- Paths & ports -------------------------------------------------------------
 
 # SQLite database path
 GROWATT_DB=/var/lib/growatt/growatt.db
@@ -21,13 +21,13 @@ GROWATT_PROXY_PORT=5020
 # Dashboard / Prometheus HTTP port (default: 8081)
 GROWATT_HTTP_PORT=8081
 
-# ── Driver ────────────────────────────────────────────────────────────────────
+# -- Driver --------------------------------------------------------------------
 
 # Force a specific driver ID (default: auto-detect)
 # Available: growatt_vpp, growatt_mod_hu
 #GROWATT_DRIVER=
 
-# ── MQTT exporter (uncomment to enable) ───────────────────────────────────────
+# -- MQTT exporter (uncomment to enable) ---------------------------------------
 
 #GROWATT_MQTT_HOST=
 #GROWATT_MQTT_PORT=1883
@@ -35,7 +35,7 @@ GROWATT_HTTP_PORT=8081
 #GROWATT_MQTT_PASS=
 #GROWATT_MQTT_TOPIC_PREFIX=
 
-# ── InfluxDB exporter (uncomment to enable) ───────────────────────────────────
+# -- InfluxDB exporter (uncomment to enable) -----------------------------------
 
 #GROWATT_INFLUX_URL=
 #GROWATT_INFLUX_TOKEN=
