@@ -8,7 +8,6 @@ from growatt.drivers.registry import auto_select
 from growatt.store import GrowattStore
 from pymodbus.client import ModbusTcpClient
 from growatt_collector import poll_datalogger
-from growatt_modbus_server import run as run_modbus_server
 from dashboard.app import create_app
 
 logging.basicConfig(
@@ -115,6 +114,7 @@ def main():
 
     # 2. Start Modbus proxy server thread (optional -- disabled when port is 0)
     if args.proxy_port:
+        from growatt_modbus_server import run as run_modbus_server
         threading.Thread(
             target=run_modbus_server,
             args=(store, proxy_cfg, args.proxy_port),
