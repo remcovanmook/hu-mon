@@ -11,7 +11,9 @@ const extremes = {
     grid_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
     grid_ll: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
     eps_v: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
-    eps_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity}))
+    eps_c: Array.from({length: 3}, () => ({min: Infinity, max: -Infinity})),
+    bat_v: [{min: Infinity, max: -Infinity}],
+    bat_i: [{min: Infinity, max: -Infinity}]
 };
 let statusAnnotations = {};
 let lastStatus = null;
@@ -148,6 +150,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("tab-btn-pv").addEventListener("click", () => switchTab("pv"));
     document.getElementById("tab-btn-grid").addEventListener("click", () => switchTab("grid"));
     document.getElementById("tab-btn-eps").addEventListener("click", () => switchTab("eps"));
+    const batBtn = document.getElementById("tab-btn-bat");
+    if (batBtn) batBtn.addEventListener("click", () => switchTab("bat"));
 
     recolorCharts();   // populate WYE_CSS before first draw
     initWyeDiagram();
@@ -171,6 +175,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             extremes.grid_ll[i] = {min: Infinity, max: -Infinity};
             extremes.eps_v[i] = {min: Infinity, max: -Infinity};
             extremes.eps_c[i] = {min: Infinity, max: -Infinity}; }
+        extremes.bat_v[0] = {min: Infinity, max: -Infinity};
+        extremes.bat_i[0] = {min: Infinity, max: -Infinity};
         statusAnnotations = {};
         lastStatus = null;
 
@@ -295,6 +301,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     charts.invTemp = createChart('chart-inv-temp', [{ label: 'Inverter Temp', color: COLORS.l1 }], false);
     charts.bstTemp = createChart('chart-bst-temp', [{ label: 'Boost Temp', color: COLORS.l2 }], false);
 
+    // Battery tab charts
+    charts.bat = createChart('chart-bat', [{ label: 'Battery Power (W)', color: COLORS.net }]);
+    charts.batSoc = createChart('chart-bat-soc', [{ label: 'SOC (%)', color: COLORS.delivered }]);
+    if (charts.batSoc) {
+        charts.batSoc.options.scales.y.min = 0;
+        charts.batSoc.options.scales.y.max = 100;
+        charts.batSoc.options.scales.y.ticks = { callback: v => v + '%' };
+    }
+    charts.batV = createChart('chart-bat-v', [{ label: 'Voltage (V)', color: COLORS.l1 }], false);
+    charts.batI = createChart('chart-bat-i', [{ label: 'Current (A)', color: COLORS.l2 }], false);
+
     const tickClock = () => {
         const el = document.getElementById("header-time");
         if(el) el.innerText = new Date().toLocaleTimeString();
@@ -337,7 +354,7 @@ async function loadHistory(since) {
         if(data.length === 0) return;
         
         const labels = [];
-        const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]], freq: [[]], invTemp: [[]], bstTemp: [[]] };
+        const ds = { overview: [[],[],[]], pv: [[],[],[],[]], grid: [[],[],[],[]], eps: [[],[],[],[]], freq: [[]], invTemp: [[]], bstTemp: [[]], bat: [[]], batSoc: [[]], batV: [[]], batI: [[]] };
         
         // Initialize arrays for sparklines
         for(let i=1; i<=3; i++) { ds[`chart-v-pv${i}`] = [[]]; ds[`chart-c-pv${i}`] = [[]]; }
@@ -366,6 +383,18 @@ async function loadHistory(since) {
             let inv = d.inverter_temp_mean === 0 ? null : d.inverter_temp_mean;
             let bst = d.boost_temp_mean === 0 ? null : d.boost_temp_mean;
             ds.freq[0].push(freq); ds.invTemp[0].push(inv); ds.bstTemp[0].push(bst);
+
+            // Battery history
+            ds.bat[0].push(Math.round(d.bat_p_mean));
+            ds.batSoc[0].push(d.bat_soc_mean);
+            const batV = d.bat_v_mean || 0;
+            const batI = d.bat_i_mean || 0;
+            ds.batV[0].push(batV);
+            ds.batI[0].push(batI);
+            if (batV < extremes.bat_v[0].min) extremes.bat_v[0].min = batV;
+            if (batV > extremes.bat_v[0].max) extremes.bat_v[0].max = batV;
+            if (batI < extremes.bat_i[0].min) extremes.bat_i[0].min = batI;
+            if (batI > extremes.bat_i[0].max) extremes.bat_i[0].max = batI;
             
             for(let i=1; i<=3; i++) {
                 let v = d[`pv${i}_v_mean`], c = d[`pv${i}_a_mean`];
@@ -443,6 +472,8 @@ async function loadHistory(since) {
         const epsCCharts = [1,2,3].map(i => charts[`chart-c-eps${i}`]);
         syncChartScales(epsVCharts, extremes.eps_v, 0);
         syncChartScales(epsCCharts, extremes.eps_c, 0);
+        syncChartScales([charts.batV], extremes.bat_v, 0);
+        syncChartScales([charts.batI], extremes.bat_i);
 
 
         for(let i=1; i<=4; i++) {
@@ -456,6 +487,8 @@ async function loadHistory(since) {
             updateSparklineAnnotations(charts[`chart-v-eps${i}`], extremes.eps_v[i-1].min, extremes.eps_v[i-1].max, COLORS[`l${i}`]);
             updateSparklineAnnotations(charts[`chart-c-eps${i}`], extremes.eps_c[i-1].min, extremes.eps_c[i-1].max, COLORS[`l${i}`]);
         }
+        updateSparklineAnnotations(charts.batV, extremes.bat_v[0].min, extremes.bat_v[0].max, COLORS.l1);
+        updateSparklineAnnotations(charts.batI, extremes.bat_i[0].min, extremes.bat_i[0].max, COLORS.l2);
         
         Object.values(charts).forEach(c => { if(c) c.update('none'); });
     } catch(e) {
@@ -707,6 +740,31 @@ function connectSSE() {
 
         updateDOM("bat-soc", d.bat_soc.toFixed(1));
 
+        // --- Battery tab DOM updates ---
+        updateDOM("sum-bat-val", Math.abs(d.bat_p).toFixed(0));
+        updateDOM("bat-soc-val", d.bat_soc.toFixed(1));
+        updateDOM("bat-soc-info", d.bat_soc.toFixed(1) + " %");
+        const batPowerLabel = d.bat_p > 10 ? "Charging" : d.bat_p < -10 ? "Discharging" : "Idle";
+        updateDOM("bat-status", batPowerLabel);
+        updateDOM("bat-power-label", batPowerLabel);
+        if (d.bat_nominal_kwh > 0) {
+            const storedKwh = (d.bat_soc / 100) * d.bat_nominal_kwh;
+            updateDOM("bat-nominal", d.bat_nominal_kwh.toFixed(1) + " kWh");
+            updateDOM("bat-stored", storedKwh.toFixed(1) + " kWh");
+            const autonomyHrs = d.load_p > 0 ? (storedKwh * 1000 / d.load_p).toFixed(1) : "\u2014";
+            updateDOM("bat-autonomy-detail", autonomyHrs + " hrs");
+        } else {
+            updateDOM("bat-nominal", "\u2014 kWh");
+            updateDOM("bat-stored", "\u2014 kWh");
+            updateDOM("bat-autonomy-detail", "\u2014 hrs");
+        }
+        updateDOM("bat-charge-today", d.bat_charge_today_kwh.toFixed(1) + " kWh");
+        updateDOM("bat-discharge-today", d.bat_discharge_today_kwh.toFixed(1) + " kWh");
+        updateDOM("bat-charge-total", d.bat_charge_total_kwh.toFixed(0) + " kWh");
+        updateDOM("bat-discharge-total", d.bat_discharge_total_kwh.toFixed(0) + " kWh");
+        updateDOM("val-bat-v", d.bat_v.toFixed(1) + " V");
+        updateDOM("val-bat-i", d.bat_i.toFixed(1) + " A");
+
         pushChart(charts.overview, ts, [Math.round(d.pv_total_w), Math.round(-d.meter_total_w), Math.round(d.eps_p)]);
         pushChart(charts.pv, ts, [Math.round(d.pv_total_w), Math.round(d.pv1_w), Math.round(d.pv2_w), Math.round(d.pv3_w)]);
         pushChart(charts.grid, ts, [Math.round(-d.meter_total_w), Math.round(g1w), Math.round(g2w), Math.round(g3w)]);
@@ -730,6 +788,22 @@ function connectSSE() {
         pushChart(charts.freq, ts, [freq]);
         pushChart(charts.invTemp, ts, [inv]);
         pushChart(charts.bstTemp, ts, [bst]);
+
+        // Battery charts
+        pushChart(charts.bat, ts, [Math.round(d.bat_p)]);
+        pushChart(charts.batSoc, ts, [d.bat_soc]);
+        pushChart(charts.batV, ts, [d.bat_v]);
+        pushChart(charts.batI, ts, [d.bat_i]);
+
+        // Battery sparkline extremes
+        if (d.bat_v < extremes.bat_v[0].min) extremes.bat_v[0].min = d.bat_v;
+        if (d.bat_v > extremes.bat_v[0].max) extremes.bat_v[0].max = d.bat_v;
+        if (d.bat_i < extremes.bat_i[0].min) extremes.bat_i[0].min = d.bat_i;
+        if (d.bat_i > extremes.bat_i[0].max) extremes.bat_i[0].max = d.bat_i;
+        syncChartScales([charts.batV], extremes.bat_v, 0);
+        syncChartScales([charts.batI], extremes.bat_i);
+        updateSparklineAnnotations(charts.batV, extremes.bat_v[0].min, extremes.bat_v[0].max, COLORS.l1);
+        updateSparklineAnnotations(charts.batI, extremes.bat_i[0].min, extremes.bat_i[0].max, COLORS.l2);
     });
 }
 
