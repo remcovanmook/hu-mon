@@ -1,14 +1,44 @@
-# Growatt Modbus Proxy Defaults
-# Environment variables for the systemd service
+# Growatt Modbus Proxy & Telemetry Server
+# Environment variables sourced by the systemd/sysv init system.
+# The Python binary reads these directly from its environment.
 
-# REQUIRED: The IP address of the ShineWifi datalogger
-GROWATT_DEVICE_IP=192.0.2.254
+# ── Required ──────────────────────────────────────────────────────────────────
+
+# IP address of the ShineWifi-X2 datalogger
+GROWATT_DEVICE_IP=[IP_ADDRESS]
+
+# ── Paths & ports ─────────────────────────────────────────────────────────────
 
 # SQLite database path
 GROWATT_DB=/var/lib/growatt/growatt.db
 
-# Proxy Port (default 5020)
+# Modbus TCP port on the datalogger (default: 502)
+GROWATT_DATALOGGER_PORT=502
+
+# Modbus proxy listen port (default: 5020, set to 0 to disable)
 GROWATT_PROXY_PORT=5020
 
-# Dashboard / HTTP Port (default 8080)
+# Dashboard / Prometheus HTTP port (default: 8081)
 GROWATT_HTTP_PORT=8081
+
+# ── Driver ────────────────────────────────────────────────────────────────────
+
+# Force a specific driver ID (default: auto-detect)
+# Available: growatt_vpp, growatt_mod_hu
+#GROWATT_DRIVER=
+
+# ── MQTT exporter (uncomment to enable) ───────────────────────────────────────
+
+#GROWATT_MQTT_HOST=
+#GROWATT_MQTT_PORT=1883
+#GROWATT_MQTT_USER=
+#GROWATT_MQTT_PASS=
+#GROWATT_MQTT_TOPIC_PREFIX=
+
+# ── InfluxDB exporter (uncomment to enable) ───────────────────────────────────
+
+#GROWATT_INFLUX_URL=
+#GROWATT_INFLUX_TOKEN=
+#GROWATT_INFLUX_ORG=
+#GROWATT_INFLUX_BUCKET=
+#GROWATT_INFLUX_DB=growatt
