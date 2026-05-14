@@ -100,6 +100,7 @@
       <button class="tab-btn" id="tab-btn-pv" role="tab" aria-selected="false" aria-controls="tab-pv">PV Power</button>
       <button class="tab-btn" id="tab-btn-grid" role="tab" aria-selected="false" aria-controls="tab-grid">Grid Power</button>
       <button class="tab-btn" id="tab-btn-eps" role="tab" aria-selected="false" aria-controls="tab-eps">EPS Power</button>
+      <button class="tab-btn" id="tab-btn-bat" role="tab" aria-selected="false" aria-controls="tab-bat">Battery</button>
     </nav>
 
     </div><!-- /.sticky-chrome-inner -->
@@ -424,6 +425,106 @@
       </section>
 
     </div><!-- /#tab-eps -->
+
+    <!-- ══ Tab 5: Battery ══════════════════════════════════════════ -->
+    <div id="tab-bat" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-bat" hidden>
+
+      <!-- Section 1: Battery Info -->
+      <section class="section" aria-labelledby="bat-info-heading">
+        <h2 id="bat-info-heading" class="section-title">Battery Information</h2>
+        <article class="card" id="bat-info-card">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; align-items: start;">
+            <!-- Row 1: status, SOC, stored energy, autonomy -->
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Status</div>
+              <div style="font-weight: 600; color: var(--delivered-color);" id="bat-status">—</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">State of Charge</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-soc-info">— %</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Stored Energy</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-stored">— kWh</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Autonomy</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-autonomy-detail">— hrs</div>
+            </div>
+
+            <!-- Row 2: nominal capacity, charged today, discharged today -->
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Nominal Capacity</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-nominal">— kWh</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Charged Today</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-charge-today">— kWh</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Discharged Today</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-discharge-today">— kWh</div>
+            </div>
+            <div></div>
+
+            <!-- Row 3: charged total, discharged total -->
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Charged Total</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-charge-total">— kWh</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem;">Discharged Total</div>
+              <div style="font-weight: 500; font-family: monospace;" id="bat-discharge-total">— kWh</div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- Section 2a: Battery Power chart -->
+      <section class="section" aria-labelledby="bat-power-heading">
+        <h2 id="bat-power-heading" class="section-title">Battery Power</h2>
+        <div class="chart-card" id="bat-power-display">
+          <div class="power-card-header">
+            <div class="power-card-headline">
+              <span class="power-direction" id="bat-power-label">Battery Power</span>
+              <span class="power-value mono" id="sum-bat-val">—</span>
+              <span class="power-unit">W</span>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="chart-bat" aria-label="Battery power history"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Section 2b: State of Charge chart -->
+      <section class="section" aria-labelledby="bat-soc-heading">
+        <h2 id="bat-soc-heading" class="section-title">State of Charge</h2>
+        <div class="chart-card" id="bat-soc-display">
+          <div class="power-card-header">
+            <div class="power-card-headline">
+              <span class="power-direction">SOC</span>
+              <span class="power-value mono" id="bat-soc-val">—</span>
+              <span class="power-unit">%</span>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="chart-bat-soc" aria-label="Battery state of charge history"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Section 3: Voltage & Current sparklines -->
+      <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;">
+        <div class="card mini-chart" style="padding: 1rem;">
+          <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top:0; margin-bottom: 0.5rem;">Battery Voltage</h3>
+          <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; font-family: monospace;" id="val-bat-v">— V</div>
+          <div class="chart-wrapper chart-wrapper--inline"><canvas id="chart-bat-v" aria-label="Battery voltage history"></canvas></div>
+        </div>
+        <div class="card mini-chart" style="padding: 1rem;">
+          <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-top:0; margin-bottom: 0.5rem;">Battery Current</h3>
+          <div style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; font-family: monospace;" id="val-bat-i">— A</div>
+          <div class="chart-wrapper chart-wrapper--inline"><canvas id="chart-bat-i" aria-label="Battery current history"></canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /#tab-bat -->
 </main>
 
   <footer class="footer"></footer>
