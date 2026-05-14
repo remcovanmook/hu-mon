@@ -141,7 +141,7 @@ def run_influx_loop(
     :param db:     v1 database name.
     """
     publisher = InfluxPublisher(url, token, org, bucket, db)
-    logger.info("InfluxDB exporter started → %s", url)
+    logger.info("InfluxDB exporter started -> %s", url)
     last_ts = 0
     while True:
         time.sleep(2.0)

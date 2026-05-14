@@ -10,7 +10,7 @@ Every concrete driver must:
 
 ProbeContext is populated by the shared probe pipeline in registry.py and
 passed to every driver's probe() method.  Drivers must not perform additional
-Modbus reads inside probe() — they work exclusively with the data already in
+Modbus reads inside probe() -- they work exclusively with the data already in
 the context.
 """
 
@@ -47,7 +47,7 @@ class DeviceInfo:
 @dataclass
 class ProbeContext:
     """
-    Results of the shared probe pipeline (registry.py Stages 1–3).
+    Results of the shared probe pipeline (registry.py Stages 1-3).
 
     Carried into every driver's probe() method so no Modbus reads are repeated
     during driver matching.
@@ -56,7 +56,7 @@ class ProbeContext:
         slave_id:       Modbus slave address confirmed to respond.
         supported_fcs:  Set of function codes (3, 4) that responded without
                         error at the confirmed slave_id.
-        holding_block:  Registers 0–124 read via FC 03, or None if FC 03 was
+        holding_block:  Registers 0-124 read via FC 03, or None if FC 03 was
                         unavailable or all chunk-size attempts failed.
         max_block_size: Largest register count accepted in a single request
                         during Stage 3.  Stored as a capability tell; drivers
@@ -67,7 +67,7 @@ class ProbeContext:
     holding_block: Optional[list]
     max_block_size: int
     input_block: Optional[list] = field(default=None)
-    """Registers 3000–3029 read via FC 04, or None if FC 04 was unavailable.
+    """Registers 3000-3029 read via FC 04, or None if FC 04 was unavailable.
     Contains inverter-side data (status, PV power) from Protocol II address
     space, which the ShineWifi-X2 bridges correctly unlike FC 03."""
 
@@ -84,7 +84,7 @@ class ProbeContext:
     proto_ii_us_available: bool = False
     """True when FC 03 3125 responds with non-error data.  Only probed when
     DTC is 5100 (MIN TL-XH/XH(P)), the only model with a documented US-market
-    extension at 3125–3249.  False for all other device families."""
+    extension at 3125-3249.  False for all other device families."""
 
 
 @dataclass
@@ -148,7 +148,7 @@ class BaseDriver(ABC):
         the attached device.
 
         Rules:
-        - Must never raise — return False on any uncertainty or error.
+        - Must never raise -- return False on any uncertainty or error.
         - Must not perform additional Modbus reads.
         - Must be fast: all data needed is already in ctx.
         """
@@ -159,7 +159,7 @@ class BaseDriver(ABC):
         Perform one-time metadata reads and return a populated DeviceInfo.
 
         Called once after probe() succeeds, before the poll loop starts.
-        May raise on read errors — the caller will retry or abort.
+        May raise on read errors -- the caller will retry or abort.
 
         :param client:   Active pymodbus ModbusTcpClient.
         :param slave_id: Confirmed Modbus slave address from ProbeContext.

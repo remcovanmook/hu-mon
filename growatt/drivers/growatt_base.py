@@ -22,7 +22,7 @@ from growatt.drivers.base import BaseDriver, ProbeContext
 from modbus.codec import ascii_regs, s32_be, u16_be, u32_be
 
 # ---------------------------------------------------------------------------
-# Growatt series code → series name mapping.
+# Growatt series code -> series name mapping.
 # All series codes Growatt has assigned across the Protocol I/II range.
 # ---------------------------------------------------------------------------
 GROWATT_SERIES = {
@@ -157,7 +157,7 @@ class GrowattBaseDriver(BaseDriver):
             _log.info("_is_growatt: status register 3000 = %d is out of range [0,10]", status)
             return False
 
-        _log.info("_is_growatt: OK — status=0x%04X FC04 3000-3029 present", status)
+        _log.info("_is_growatt: OK -- status=0x%04X FC04 3000-3029 present", status)
         return True
 
 
@@ -168,7 +168,7 @@ class GrowattBaseDriver(BaseDriver):
 
         Called only if _is_growatt() returned True.  Subclasses inspect the
         holding block for series-specific identifiers (series code from Regs
-        28–29 and device type from Reg 121).
+        28-29 and device type from Reg 121).
 
         Must return False (not raise) on any uncertainty.
 

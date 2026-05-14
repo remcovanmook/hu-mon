@@ -54,11 +54,11 @@ async def run_mqtt_loop(
     Async loop: connect to MQTT broker and publish readings as they arrive.
 
     Publishes two formats on every new reading:
-    - ``<prefix>state`` — full JSON summary payload.
-    - ``<prefix><field>`` — individual numeric value per field in
+    - ``<prefix>state`` -- full JSON summary payload.
+    - ``<prefix><field>`` -- individual numeric value per field in
       ``_INDIVIDUAL_FIELDS``, as a plain string.
 
-    Reconnects with exponential back-off (2 s → 64 s) on connection loss.
+    Reconnects with exponential back-off (2 s -> 64 s) on connection loss.
 
     :param store:        GrowattStore providing latest readings.
     :param host:         MQTT broker hostname or IP.
@@ -71,7 +71,7 @@ async def run_mqtt_loop(
     """
     if not _AIOMQTT_AVAILABLE:
         logger.warning(
-            "aiomqtt not installed — MQTT exporter disabled. "
+            "aiomqtt not installed -- MQTT exporter disabled. "
             "Install with: pip install aiomqtt"
         )
         return
@@ -112,7 +112,7 @@ async def run_mqtt_loop(
         except asyncio.CancelledError:
             return
         except Exception as exc:
-            logger.warning("MQTT error: %s — reconnecting in %ds", exc, backoff)
+            logger.warning("MQTT error: %s -- reconnecting in %ds", exc, backoff)
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 64)
 

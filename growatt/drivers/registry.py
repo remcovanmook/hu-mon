@@ -5,30 +5,30 @@ Device driver registry and the five-stage probe pipeline.
 
 Probe pipeline (runs once at startup, not on reconnect)
 -------------------------------------------------------
-Stage 1 — Slave ID discovery
+Stage 1 -- Slave ID discovery
     Tries candidate slave IDs in order.  First to respond wins.
 
-Stage 2 — Function code support
+Stage 2 -- Function code support
     Tests FC 03 (holding) and FC 04 (input) individually.  Records which
     codes are available; drivers that require an absent FC are skipped.
 
-Stage 3 — Inverter holding block (FC 03, 0–124)
+Stage 3 -- Inverter holding block (FC 03, 0-124)
     Inverter FC03 holding registers accessed directly via the RS485-to-TCP
     gateway.  Cached for drivers that read firmware / device_type from this
     range; not used for primary VPP identification.
 
-Stage 3b — Inverter input block (FC 04, 3000–3029)
+Stage 3b -- Inverter input block (FC 04, 3000-3029)
     Inverter FC04 input registers (Protocol II address space).  Used by
     GrowattBaseDriver to confirm vendor identity via the status register.
 
-Stage 3c — VPP DTC + Protocol Version (FC 03, 30000 + 30099)
+Stage 3c -- VPP DTC + Protocol Version (FC 03, 30000 + 30099)
     Reads the full 100-register Basic Parameter block.  DTC from 30000 is
     used for model metadata (series, phases, has_eps).  Protocol Version from
     30099 (e.g. 202 = V2.02) is the primary identifier: a value in 200-299
     confirms VPP capability and is stored in ctx.vpp_protocol_version.
     ctx.vpp_dtc is retained for use by GrowattVppDriver._probe_series().
 
-Stage 4 — Driver matching
+Stage 4 -- Driver matching
     Iterates DRIVER_REGISTRY in order.  Returns the first driver whose
     probe() returns True.
 
@@ -58,7 +58,7 @@ _SLAVE_ID_CANDIDATES = [1, 2, 3, 247]
 _BLOCK_CHUNK_SIZES = [125, 64, 32, 16]
 
 # ---------------------------------------------------------------------------
-# Driver registry — probe priority order matters.
+# Driver registry -- probe priority order matters.
 # VPP driver first: takes precedence when DTC register 30000 responds.
 # GrowattModHuDriver is the fallback for older firmware without VPP.
 # ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def _detect_function_codes(client, slave_id: int) -> set:
 
 def _read_holding_block(client, slave_id: int) -> Tuple[Optional[list], int]:
     """
-    Read Holding Registers 0–124 in chunks, falling back to smaller chunk
+    Read Holding Registers 0-124 in chunks, falling back to smaller chunk
     sizes if the device rejects larger requests.
 
     The successful chunk size is itself a device capability tell (e.g. a
@@ -130,7 +130,7 @@ def _read_holding_block(client, slave_id: int) -> Tuple[Optional[list], int]:
     :param slave_id: Confirmed slave address.
     :returns: Tuple of (register_list_or_None, max_chunk_size_or_0).
     """
-    target_end = 125  # Read registers 0–124 inclusive.
+    target_end = 125  # Read registers 0-124 inclusive.
     max_chunk = 0
 
     # Determine the largest accepted chunk size.
@@ -175,7 +175,7 @@ def auto_select(
     Run the probe pipeline and return the matching driver, slave ID, and
     ProbeContext.
 
-    Stages 1–3 always run (needed to establish slave_id and ProbeContext).
+    Stages 1-3 always run (needed to establish slave_id and ProbeContext).
     Stage 4 (driver matching) is skipped if force_driver_id is given.
 
     :param client:          Active pymodbus ModbusTcpClient.
@@ -243,7 +243,7 @@ def auto_select(
                     vpp_protocol_version = ver
                     logger.info("VPP Protocol Version: %d (V%d.%02d)", ver, ver // 100, ver % 100)
                 else:
-                    logger.debug("VPP 30099=%d — not a plausible VPP version", ver)
+                    logger.debug("VPP 30099=%d -- not a plausible VPP version", ver)
                 non_zero_vpp = {30000 + i: v for i, v in enumerate(r.registers) if v != 0}
                 logger.debug(
                     "VPP block 30000-30099 non-zero: %s",
@@ -254,7 +254,7 @@ def auto_select(
         except Exception as exc:
             logger.debug("VPP block read failed: %s", exc)
 
-    # Stage 3d: US-variant probe — only for MIN TL-XH (DTC 5100).
+    # Stage 3d: US-variant probe -- only for MIN TL-XH (DTC 5100).
     # FC03 3125 is the start of the US-specific extension block.  All other
     # model families have a fixed register map; only 5100 has two variants.
     proto_ii_us_available = False

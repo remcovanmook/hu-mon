@@ -1,7 +1,7 @@
 """
 growatt.drivers.growatt_vpp.driver
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GrowattVppDriver — telemetry driver for Growatt inverters supporting
+GrowattVppDriver -- telemetry driver for Growatt inverters supporting
 VPP Protocol V2.01 or later (identified via DTC at FC 03 register 30000).
 
 Primary register source: VPP (FC03 30000+, FC04 31000+).
@@ -60,7 +60,7 @@ def _ll_to_ln(v_rs: float, v_st: float, v_tr: float) -> tuple:
       1. Fix V_S at the origin and V_T on the positive x-axis.
       2. Locate V_R using the law of cosines at vertex S.
       3. Compute the centroid G = (V_R + V_S + V_T) / 3.
-      4. Return |V_R − G|, |V_S − G|, |V_T − G|.
+      4. Return |V_R - G|, |V_S - G|, |V_T - G|.
 
     Works for any triangle (balanced or unbalanced phase voltages) and
     requires no approximation beyond the wye-with-grounded-neutral model.
@@ -68,7 +68,7 @@ def _ll_to_ln(v_rs: float, v_st: float, v_tr: float) -> tuple:
     :param v_rs: Line-to-line voltage magnitude RS (volts).
     :param v_st: Line-to-line voltage magnitude ST (volts).
     :param v_tr: Line-to-line voltage magnitude TR (volts).
-    :returns:    Tuple (v_rn, v_sn, v_tn) — L-N voltage magnitudes in volts.
+    :returns:    Tuple (v_rn, v_sn, v_tn) -- L-N voltage magnitudes in volts.
     :raises ValueError: If the three magnitudes cannot form a valid triangle.
     """
     # Guard: triangle inequality (any two sides must exceed the third)
@@ -159,8 +159,8 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     #   51xx = MIN-XH
     #   52xx = MIC/MIN-X (grid-tie, no battery)
     #   54xx = MOD/MID-XH or HU (3-phase hybrid)
-    #   50xx = MOD/MID/MAC-X (3-phase grid-tie, no battery) — V2.03 addition
-    #   55xx = MAX (large 3-phase grid-tie, no battery)     — V2.03 addition
+    #   50xx = MOD/MID/MAC-X (3-phase grid-tie, no battery) -- V2.03 addition
+    #   55xx = MAX (large 3-phase grid-tie, no battery)     -- V2.03 addition
     #   56xx = WIT (large commercial, 3-phase, EPS)
     #   58xx = WIS (large commercial, 3-phase, no EPS)
 
@@ -189,7 +189,7 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     5200: _DtcEntry("MIC", False, 1, _RegProfile.BASE_PROTO_II),  # MIC 600-3300TL-X/X2/X2(Pro); MIN 2500-6000TL-X/X2/X2(Pro)/X2(Pro.E)
     5201: _DtcEntry("MIN", False, 1, _RegProfile.BASE_PROTO_II),  # MIN 7-10KTL-X/X2/X2(E)
 
-    # --- MOD/MID/MAC-X 3-phase grid-tie, no battery (BASE_PROTO_II_VPP) — V2.03 ---
+    # --- MOD/MID/MAC-X 3-phase grid-tie, no battery (BASE_PROTO_II_VPP) -- V2.03 ---
     5000: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID/MAC-X (base)
     5001: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MID 17-25KTL3-X; MID 20-30KTL3-X2; MID 25-50KTL3-X2 Pro; MID 30-40KTL3-X
     5002: _DtcEntry("MID", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MID 33-36KTL3-X(Pro.E); MID 3-33KTL3-X3; MOD 3-15KTL3-X
@@ -199,18 +199,18 @@ _VPP_DTC_TABLE: Dict[int, _DtcEntry] = {
     5400: _DtcEntry("MOD", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MOD-XH/MID-XH; MOD 3-10KTL3-XH/BP; MID 11-30KTL3-XH; MID 8-15KTL3-XHL/JP
     5401: _DtcEntry("MOD", True,  3, _RegProfile.BASE_PROTO_II_VPP), # MOD/MID-HU; MOD 3-15KTL3-HU; MID 33-50KTL3-HU  (confirmed: 12KTL3-HU V2.02)
 
-    # --- MAX 3-phase grid-tie, large commercial (BASE_PROTO_II_VPP) — V2.03 ---
+    # --- MAX 3-phase grid-tie, large commercial (BASE_PROTO_II_VPP) -- V2.03 ---
     5500: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 50-100KTL3 LV/MV
     5501: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 175-253KTL3-X HV
     5502: _DtcEntry("MAX", False, 3, _RegProfile.BASE_PROTO_II_VPP), # MAX 80-150KTL3-X LV/MV; MAX 100-150KYL3-X2 LV/MV; MAX 320-350KTL3-X
 
     # --- WIT large commercial 3-phase with EPS (BASE_PROTO_I_WIT) ---
-    5600: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_I_WIT),  # WIS 100K-AM — V2.03 addition
+    5600: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_I_WIT),  # WIS 100K-AM -- V2.03 addition
     5601: _DtcEntry("WIT", True,  3, _RegProfile.BASE_PROTO_I_WIT),  # WIT 50-100K-H/HE/HU/A/AE/AU; WIT 28-55K-H/HE/HU/A/AE/AU-US L2; WIT29.9-50K-XHU
 
     # --- WIS large commercial 3-phase, no EPS ---
     5800: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 210K
-    5801: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 215K-AM — V2.03 addition
+    5801: _DtcEntry("WIS", False, 3, _RegProfile.BASE_PROTO_II),     # WIS 215K-AM -- V2.03 addition
 }
 
 # DTCs for which battery registers (31200+) and energy storage registers are not applicable.
@@ -305,13 +305,13 @@ class GrowattVppDriver(GrowattBaseDriver):
         VPP series check.
 
         Priority:
-          1. Known DTC in _VPP_DTC_TABLE  →  accept unconditionally.
+          1. Known DTC in _VPP_DTC_TABLE  ->  accept unconditionally.
              DTC codes are from the VPP spec; their presence is authoritative.
-          2. Unknown DTC + valid vpp_protocol_version (200-299)  →  accept.
+          2. Unknown DTC + valid vpp_protocol_version (200-299)  ->  accept.
              Newer hardware likely supports VPP; infer a generic profile.
-          3. Anything else  →  reject.
+          3. Anything else  ->  reject.
 
-        vpp_protocol_version is NOT used as a gate for known DTCs —
+        vpp_protocol_version is NOT used as a gate for known DTCs --
         it is retained for version-gated register-map branching in
         read_registers.
 
@@ -319,13 +319,13 @@ class GrowattVppDriver(GrowattBaseDriver):
         :returns:   True if this is a VPP-capable Growatt inverter.
         """
         if ctx.vpp_dtc is None:
-            logger.info("growatt_vpp: no DTC — not a VPP device")
+            logger.info("growatt_vpp: no DTC -- not a VPP device")
             return False
 
         entry = _VPP_DTC_TABLE.get(ctx.vpp_dtc)
         if entry:
             logger.info(
-                "growatt_vpp: DTC %d → %s, profile=%s, has_eps=%s, phases=%d",
+                "growatt_vpp: DTC %d -> %s, profile=%s, has_eps=%s, phases=%d",
                 ctx.vpp_dtc, entry.series, entry.reg_profile.value,
                 entry.has_eps, entry.phases,
             )
@@ -335,13 +335,13 @@ class GrowattVppDriver(GrowattBaseDriver):
         ver = ctx.vpp_protocol_version
         if ver is not None and 200 <= ver <= 299:
             logger.info(
-                "growatt_vpp: DTC %d unknown, VPP V%d.%02d confirmed — using generic profile",
+                "growatt_vpp: DTC %d unknown, VPP V%d.%02d confirmed -- using generic profile",
                 ctx.vpp_dtc, ver // 100, ver % 100,
             )
             return True
 
         logger.info(
-            "growatt_vpp: DTC %d unknown and no valid vpp_protocol_version (%s) — rejecting",
+            "growatt_vpp: DTC %d unknown and no valid vpp_protocol_version (%s) -- rejecting",
             ctx.vpp_dtc, ver,
         )
         return False
@@ -366,7 +366,7 @@ class GrowattVppDriver(GrowattBaseDriver):
             30001-30015     Serial number (15 words, 30-char ASCII)
             30016-30017     Rated power Pn (0.1 W)
             30060-30061     Inverter type-model chars (ASCII, e.g. "TL" + "AA")
-            30099           VPP protocol version (201 = V2.01, 202 = V2.02 …)
+            30099           VPP protocol version (201 = V2.01, 202 = V2.02 ...)
           FC03 9-14         Firmware string (inverter FC03 holding register)
           FC03 1001         Battery type (0=none, 1=Li-ion)
           FC03 1005         Battery nominal capacity (0.1 kWh)
@@ -399,7 +399,7 @@ class GrowattVppDriver(GrowattBaseDriver):
                 pn_raw = _u32(r.registers[16], r.registers[17])
                 rated_w = int(pn_raw / 10.0)
 
-                # 30060-30061: DSP firmware model code (2×ASCII, high+low byte per reg).
+                # 30060-30061: DSP firmware model code (2xASCII, high+low byte per reg).
                 # e.g. 'DO'+'AA' on MOD 12KTL3-HU running DO1.0.  This is the internal
                 # DSP version name, *not* the inverter topology suffix ('TL'/'KTL').
                 # The topology comes from _build_model_string via the DTC entry.
@@ -419,7 +419,7 @@ class GrowattVppDriver(GrowattBaseDriver):
                     has_eps = entry.has_eps
                     phases = entry.phases
                     logger.info(
-                        "read_device_info: DTC=%d → %s, rated_w=%dW, has_eps=%s"
+                        "read_device_info: DTC=%d -> %s, rated_w=%dW, has_eps=%s"
                         ", type=%r, vpp=%s",
                         dtc, model, rated_w, has_eps, model_type, vpp_ver_str,
                     )
@@ -445,7 +445,7 @@ class GrowattVppDriver(GrowattBaseDriver):
         except Exception as exc:
             logger.warning("read_device_info: serial exception: %s", exc)
 
-        # Firmware string at FC03 9-14 — inverter holding register, accessed
+        # Firmware string at FC03 9-14 -- inverter holding register, accessed
         # directly via the ShineWifi gateway (transparent Modbus TCP proxy).
         firmware = ""
         try:
@@ -478,9 +478,9 @@ class GrowattVppDriver(GrowattBaseDriver):
             except Exception as exc:
                 logger.warning("read_device_info: bat_nominal_kwh exception: %s", exc)
 
-        # FC03 reg 44: TP — input tracker count (high byte) and AC phase count (low byte).
-        # High byte: total input count.  On MOD 12KTL3-HU this is 8 (4 MPPTs × 2 strings,
-        # or 4 PV + 4 BDC — ambiguous from the AppNote alone).
+        # FC03 reg 44: TP -- input tracker count (high byte) and AC phase count (low byte).
+        # High byte: total input count.  On MOD 12KTL3-HU this is 8 (4 MPPTs x 2 strings,
+        # or 4 PV + 4 BDC -- ambiguous from the AppNote alone).
         # Low byte: AC output phase count.  This is authoritative: no model-string inference.
         pv_inputs = None
         try:
@@ -492,15 +492,15 @@ class GrowattVppDriver(GrowattBaseDriver):
                 if tp_phases in (1, 3):
                     phases = tp_phases   # override DTC-inferred value
                 logger.info(
-                    "read_device_info: TP=0x%04X — inputs=%d, phases=%d",
+                    "read_device_info: TP=0x%04X -- inputs=%d, phases=%d",
                     raw_tp, pv_inputs, phases,
                 )
             else:
-                logger.debug("read_device_info: FC03 reg 44 unavailable — keeping DTC-inferred phases=%d", phases)
+                logger.debug("read_device_info: FC03 reg 44 unavailable -- keeping DTC-inferred phases=%d", phases)
         except Exception as exc:
             logger.warning("read_device_info: FC03 reg 44 exception: %s", exc)
 
-        # FC03 0-124: base holding block — firmware, DTC, RTC, TP, grid thresholds.
+        # FC03 0-124: base holding block -- firmware, DTC, RTC, TP, grid thresholds.
         # Read once here so the proxy can serve this range.  The data is static;
         # no need to re-read on every poll cycle.
         try:
@@ -549,11 +549,11 @@ class GrowattVppDriver(GrowattBaseDriver):
         S0 and S4/S5 use Protocol II FC04 addresses.  All reads go through
         the same ShineWifi TCP endpoint.
 
-        Per-string PV power: V × I (DC, no power factor).
+        Per-string PV power: V x I (DC, no power factor).
         Grid voltages: L-N from Protocol II registers 3026/3030/3034 (S0).
           If S0 fails, falls back to VPP L-L registers 31106-31108 via
           phasor triangle geometry (_ll_to_ln).
-        Per-phase AC power: V_LN × I × PF where PF = P / |S|.
+        Per-phase AC power: V_LN x I x PF where PF = P / |S|.
 
         Version-gated behaviour: ``self._vpp_protocol_version`` (from FC03
         30099, set by ``read_device_info``) can be used to select different
@@ -627,7 +627,7 @@ class GrowattVppDriver(GrowattBaseDriver):
         reading.status_code = _u16(s1[0])    # 31000
         reading.fault_code  = _u16(s1[5])    # 31005
 
-        # --- PV strings (S1, 2 registers per string: V + A; P = V × I DC) ---
+        # --- PV strings (S1, 2 registers per string: V + A; P = V x I DC) ---
         reading.pv1_v = _u16(s1[10]) / 10.0   # 31010
         reading.pv1_a = _u16(s1[11]) / 10.0   # 31011
         reading.pv1_w = reading.pv1_v * reading.pv1_a
@@ -671,12 +671,12 @@ class GrowattVppDriver(GrowattBaseDriver):
             reading.grid_l2_v = _u16(s0[4]) / 10.0   # 3030 L2-N (0.1V)
             reading.grid_l3_v = _u16(s0[8]) / 10.0   # 3034 L3-N (0.1V)
         else:
-            logger.warning("growatt_vpp: S0 unavailable — deriving L-N from L-L via phasor triangle")
+            logger.warning("growatt_vpp: S0 unavailable -- deriving L-N from L-L via phasor triangle")
             reading.grid_l1_v, reading.grid_l2_v, reading.grid_l3_v = _ll_to_ln(
                 reading.grid_ll_rs_v, reading.grid_ll_st_v, reading.grid_ll_tr_v
             )
 
-        # VPP meter power: pos=import from grid → invert for GrowattReading (pos=export)
+        # VPP meter power: pos=import from grid -> invert for GrowattReading (pos=export)
         # Grid power: inverter AC output at 31100-31101 (pos = export to grid).
         # Register 31112-31113 (smart meter net power) would be more accurate for
         # net import/export, but requires a CT clamp that is not installed here.
@@ -694,7 +694,7 @@ class GrowattVppDriver(GrowattBaseDriver):
         apparent_w = math.sqrt(ac_active_w ** 2 + ac_reactive_var ** 2)
         pf = (ac_active_w / apparent_w) if apparent_w > 1.0 else 1.0
 
-        # Per-phase W = V_LN × I × PF  (grid_l*_v is now already L-N)
+        # Per-phase W = V_LN x I x PF  (grid_l*_v is now already L-N)
         reading.meter_l1_w = reading.grid_l1_v * reading.grid_l1_a * pf
         reading.meter_l2_w = reading.grid_l2_v * reading.grid_l2_a * pf
         reading.meter_l3_w = reading.grid_l3_v * reading.grid_l3_a * pf
@@ -765,7 +765,7 @@ class GrowattVppDriver(GrowattBaseDriver):
 
         The profile is derived from ``ctx.vpp_dtc`` (populated during Stage 3c
         of the probe pipeline) so this method is correct when called immediately
-        after ``auto_select`` — before ``read_device_info`` has run.
+        after ``auto_select`` -- before ``read_device_info`` has run.
 
         Falls back to ``BASE_PROTO_II_VPP`` for unknown DTCs (VPP confirmed by
         ``ctx.vpp_protocol_version``) or when DTC is absent.
