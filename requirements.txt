@@ -1,4 +1,4 @@
-pymodbus==3.6.9
+pymodbus>=3.13.0
 flask>=3.0.0
 # Optional: MQTT exporter
 aiomqtt>=2.0.0
